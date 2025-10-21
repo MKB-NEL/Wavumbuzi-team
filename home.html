@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WTM - Home</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --user-theme-color: #0d6efd; /* Default color, will be updated dynamically */
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 0 0 12px 12px;
+        }
+        
+        .user-color-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 8px;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+        }
+        
+        .main-content {
+            flex: 1;
+            padding: 2rem 0;
+        }
+        
+        .card {
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+            height: 100%;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-theme {
+            background-color: var(--user-theme-color);
+            border-color: var(--user-theme-color);
+            color: white;
+        }
+        
+        .btn-theme:hover {
+            background-color: var(--user-theme-color);
+            border-color: var(--user-theme-color);
+            opacity: 0.9;
+            color: white;
+        }
+        
+        .text-theme {
+            color: var(--user-theme-color) !important;
+        }
+        
+        .progress-bar-theme {
+            background-color: var(--user-theme-color);
+        }
+        
+        .badge-theme {
+            background-color: var(--user-theme-color);
+        }
+        
+        .upload-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1030;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .footer {
+            background-color: #fff;
+            padding: 1.5rem 0;
+            margin-top: auto;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+        }
+        
+        .footer a {
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        .footer a:hover {
+            color: var(--user-theme-color) !important;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #6c757d;
+        }
+        
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        .preview-table {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .modal-footer {
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">
+                <span class="text-theme">WTM</span> — Wavumbuzi Team Manager
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Teams</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Projects</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <span id="userName">User</span>
+                            <span class="user-color-badge" id="userColorBadge"></span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#">Profile</a></li>
+                            <li><a class="dropdown-item" href="#">Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="logoutBtn">Logout</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="row mb-4">
+                <div class="col">
+                    <h1 class="h2 fw-bold">Your Lists</h1>
+                    <p class="text-muted">Manage your team lists and upload new ones</p>
+                </div>
+            </div>
+            
+            <!-- Lists Grid -->
+            <div class="row" id="listsContainer">
+                <!-- Lists will be dynamically inserted here -->
+                <div class="col-12">
+                    <div class="empty-state">
+                        <i class="bi bi-folder-plus empty-state-icon"></i>
+                        <h3>No lists yet</h3>
+                        <p class="mb-4">Get started by uploading your first Excel list</p>
+                        <button class="btn btn-theme" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                            <i class="bi bi-cloud-upload me-2"></i>Upload Your First List
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Upload Button -->
+    <button class="btn btn-theme upload-btn" data-bs-toggle="modal" data-bs-target="#uploadModal">
+        <i class="bi bi-plus-lg fs-4"></i>
+    </button>
+
+    <!-- Upload Modal -->
+    <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadModalLabel">Upload New List</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="uploadForm">
+                        <div class="mb-3">
+                            <label for="listTitle" class="form-label">List Title</label>
+                            <input type="text" class="form-control" id="listTitle" placeholder="Enter a title for your list" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="excelFile" class="form-label">Excel File</label>
+                            <input type="file" class="form-control" id="excelFile" accept=".xlsx, .xls" required>
+                            <div class="form-text">Your Excel file must have columns: <strong>LAST NAME</strong> and <strong>FIRST NAME</strong></div>
+                        </div>
+                        
+                        <!-- Preview Section -->
+                        <div id="previewSection" class="d-none">
+                            <h6 class="mt-4 mb-3">Preview (First 10 rows)</h6>
+                            <div class="preview-table">
+                                <table class="table table-sm table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>First Name</th>
+                                            <th>Last Name</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="previewTableBody">
+                                        <!-- Preview rows will be inserted here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="alert alert-info mt-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <span id="totalRowsCount">0</span> rows found in the file
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-theme" id="saveListBtn" disabled>
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        <span class="btn-text">Upload & Save</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
+                <div class="mb-2 mb-md-0">
+                    <span class="text-muted">© 2025 Made by</span>
+                </div>
+                <div>
+                    <a href="https://github.com/mkb-nel" target="_blank" class="btn btn-outline-secondary btn-sm me-2">
+                        <i class="bi bi-github me-1"></i>GitHub
+                    </a>
+                    <a href="https://mkbertrand.vercel.app/" target="_blank" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-person-circle me-1"></i>Portfolio
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Required Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- Firebase Integration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            getDocs, 
+            query, 
+            where,
+            doc,
+            getDoc
+        } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged, 
+            signOut 
+        } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBbhxmAkHJtq3Zs17P4ewHsc8wi8-0M_XI",
+            authDomain: "developers-imw.firebaseapp.com",
+            projectId: "developers-imw",
+            storageBucket: "developers-imw.firebasestorage.app",
+            messagingSenderId: "182400720989",
+            appId: "1:182400720989:web:180f2390f7563f1ec96db4",
+            measurementId: "G-R7RDM0PMY8"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Make Firebase available globally
+        window.firebaseDb = db;
+        window.firebaseAuth = auth;
+        window.firebaseFunctions = {
+            collection,
+            addDoc,
+            getDocs,
+            query,
+            where,
+            doc,
+            getDoc,
+            signOut
+        };
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // Load user's data and apply theme
+                await loadUserData(user);
+                
+                // Fetch and display user's lists
+                await loadUserLists(user.uid);
+            } else {
+                window.location.href = "index.html";
+            }
+        });
+
+        async function loadUserData(user) {
+            try {
+                // Get user document from Firestore
+                const userDocRef = doc(db, "users", user.uid);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    
+                    // Update UI with user data
+                    document.getElementById('userName').textContent = userData.username || user.email;
+                    
+                    // Apply user's preferred color theme
+                    if (userData.color) {
+                        applyUserTheme(userData.color);
+                    }
+                }
+            } catch (error) {
+                console.error("Error loading user data:", error);
+            }
+        }
+
+        function applyUserTheme(color) {
+            // Update CSS custom property
+            document.documentElement.style.setProperty('--user-theme-color', color);
+            
+            // Update user color badge
+            document.getElementById('userColorBadge').style.backgroundColor = color;
+        }
+
+        async function loadUserLists(userId) {
+            try {
+                const listsQuery = query(
+                    collection(db, "lists"),
+                    where("ownerUid", "==", userId)
+                );
+                
+                const querySnapshot = await getDocs(listsQuery);
+                const listsContainer = document.getElementById('listsContainer');
+                
+                if (querySnapshot.empty) {
+                    // Show empty state (already in HTML)
+                    return;
+                }
+                
+                // Clear empty state
+                listsContainer.innerHTML = '';
+                
+                // Add lists to the container
+                querySnapshot.forEach((doc) => {
+                    const listData = doc.data();
+                    const listId = doc.id;
+                    
+                    const listCard = createListCard(listData, listId);
+                    listsContainer.appendChild(listCard);
+                });
+            } catch (error) {
+                console.error("Error loading user lists:", error);
+                showNotification("Error loading your lists", "error");
+            }
+        }
+
+        function createListCard(listData, listId) {
+            const col = document.createElement('div');
+            col.className = 'col-md-6 col-lg-4 mb-4';
+            
+            const formattedDate = new Date(listData.createdAt?.toDate()).toLocaleDateString();
+            
+            col.innerHTML = `
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">${listData.title || 'Untitled List'}</h5>
+                        <p class="card-text text-muted small">
+                            <i class="bi bi-calendar me-1"></i>Created: ${formattedDate}
+                        </p>
+                        <p class="card-text">
+                            <span class="badge bg-secondary">${listData.members?.length || 0} members</span>
+                        </p>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="list.html?listId=${listId}" class="btn btn-theme btn-sm">
+                            <i class="bi bi-folder-open me-1"></i>Open List
+                        </a>
+                    </div>
+                </div>
+            `;
+            
+            return col;
+        }
+
+        // Make functions available globally
+        window.loadUserLists = loadUserLists;
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Excel file handling
+            const excelFileInput = document.getElementById('excelFile');
+            const previewSection = document.getElementById('previewSection');
+            const previewTableBody = document.getElementById('previewTableBody');
+            const totalRowsCount = document.getElementById('totalRowsCount');
+            const saveListBtn = document.getElementById('saveListBtn');
+            const listTitleInput = document.getElementById('listTitle');
+            const uploadForm = document.getElementById('uploadForm');
+            
+            let parsedData = [];
+            
+            // Handle file selection
+            excelFileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                // Reset state
+                parsedData = [];
+                previewTableBody.innerHTML = '';
+                previewSection.classList.add('d-none');
+                saveListBtn.disabled = true;
+                
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        
+                        // Get first worksheet
+                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        
+                        // Convert to JSON
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                        
+                        if (jsonData.length === 0) {
+                            showNotification("The Excel file appears to be empty", "error");
+                            return;
+                        }
+                        
+                        // Validate required columns
+                        const firstRow = jsonData[0];
+                        const hasLastName = Object.keys(firstRow).some(key => 
+                            key.toLowerCase().includes('last') && key.toLowerCase().includes('name'));
+                        const hasFirstName = Object.keys(firstRow).some(key => 
+                            key.toLowerCase().includes('first') && key.toLowerCase().includes('name'));
+                        
+                        if (!hasLastName || !hasFirstName) {
+                            showNotification("Excel file must contain 'LAST NAME' and 'FIRST NAME' columns", "error");
+                            return;
+                        }
+                        
+                        // Process data
+                        parsedData = jsonData.map(row => {
+                            // Find the correct column names (case insensitive)
+                            const lastNameKey = Object.keys(row).find(key => 
+                                key.toLowerCase().includes('last') && key.toLowerCase().includes('name'));
+                            const firstNameKey = Object.keys(row).find(key => 
+                                key.toLowerCase().includes('first') && key.toLowerCase().includes('name'));
+                            
+                            return {
+                                lastName: row[lastNameKey] || '',
+                                firstName: row[firstNameKey] || ''
+                            };
+                        }).filter(member => member.lastName || member.firstName); // Remove empty rows
+                        
+                        // Show preview
+                        showPreview(parsedData);
+                        
+                        // Enable save button if title is provided
+                        saveListBtn.disabled = !listTitleInput.value.trim();
+                        
+                    } catch (error) {
+                        console.error("Error parsing Excel file:", error);
+                        showNotification("Error reading Excel file. Please check the format.", "error");
+                    }
+                };
+                
+                reader.onerror = function() {
+                    showNotification("Error reading file", "error");
+                };
+                
+                reader.readAsArrayBuffer(file);
+            });
+            
+            // Enable save button when title is entered
+            listTitleInput.addEventListener('input', function() {
+                saveListBtn.disabled = !this.value.trim() || parsedData.length === 0;
+            });
+            
+            // Save list to Firestore
+            saveListBtn.addEventListener('click', async function() {
+                const title = listTitleInput.value.trim();
+                
+                if (!title || parsedData.length === 0) {
+                    showNotification("Please provide a title and upload a valid file", "error");
+                    return;
+                }
+                
+                // Show loading state
+                const spinner = this.querySelector('.spinner-border');
+                const btnText = this.querySelector('.btn-text');
+                
+                spinner.classList.remove('d-none');
+                btnText.textContent = 'Saving...';
+                this.disabled = true;
+                
+                try {
+                    const user = auth.currentUser;
+                    if (!user) {
+                        window.location.href = "index.html";
+                        return;
+                    }
+                    
+                    // Save to Firestore
+                    const docRef = await addDoc(collection(db, "lists"), {
+                        title: title,
+                        ownerUid: user.uid,
+                        createdAt: new Date(),
+                        members: parsedData
+                    });
+                    
+                    // Success
+                    showNotification("List uploaded successfully!", "success");
+                    
+                    // Close modal and reset form
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
+                    modal.hide();
+                    uploadForm.reset();
+                    previewSection.classList.add('d-none');
+                    
+                    // Reload lists
+                    await loadUserLists(user.uid);
+                    
+                } catch (error) {
+                    console.error("Error saving list:", error);
+                    showNotification("Error saving list. Please try again.", "error");
+                } finally {
+                    // Reset button state
+                    spinner.classList.add('d-none');
+                    btnText.textContent = 'Upload & Save';
+                    saveListBtn.disabled = false;
+                }
+            });
+            
+            // Logout functionality
+            document.getElementById('logoutBtn').addEventListener('click', async function() {
+                try {
+                    await signOut(auth);
+                    window.location.href = "index.html";
+                } catch (error) {
+                    console.error("Error signing out:", error);
+                    showNotification("Error signing out", "error");
+                }
+            });
+            
+            // Reset modal when closed
+            document.getElementById('uploadModal').addEventListener('hidden.bs.modal', function() {
+                uploadForm.reset();
+                previewSection.classList.add('d-none');
+                parsedData = [];
+                saveListBtn.disabled = true;
+            });
+        });
+        
+        function showPreview(data) {
+            previewTableBody.innerHTML = '';
+            totalRowsCount.textContent = data.length;
+            
+            // Show first 10 rows
+            const previewData = data.slice(0, 10);
+            
+            previewData.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${row.firstName || ''}</td>
+                    <td>${row.lastName || ''}</td>
+                `;
+                previewTableBody.appendChild(tr);
+            });
+            
+            previewSection.classList.remove('d-none');
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 1060;
+                min-width: 300px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-radius: 8px;
+            `;
+            
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
