@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WTM - Wavumbuzi Team Manager</title>
     
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+    
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -279,6 +282,56 @@
             }
             100% {
                 background-position: -200% 0;
+            }
+        }
+        
+        /* Improved chat styles */
+        .chat-message-enter {
+            animation: messageSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes messageSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Improved loading states */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            z-index: 10;
+        }
+        
+        /* Better responsive design */
+        @media (max-width: 768px) {
+            .nav-tabs-custom .nav-link {
+                padding: 10px 15px;
+                font-size: 0.9rem;
+            }
+            
+            .upload-btn {
+                bottom: 20px;
+                right: 20px;
+                width: 50px;
+                height: 50px;
+            }
+            
+            .chat-container {
+                height: 400px;
             }
         }
     </style>
@@ -700,9 +753,22 @@
                     if (userData.color) {
                         applyUserTheme(userData.color);
                     }
+                } else {
+                    // Create a default user data object if document doesn't exist
+                    userData = {
+                        username: user.email,
+                        color: '#0d6efd'
+                    };
+                    document.getElementById('userName').textContent = user.email;
                 }
             } catch (error) {
                 console.error("Error loading user data:", error);
+                // Create fallback user data
+                userData = {
+                    username: currentUser?.email || 'User',
+                    color: '#0d6efd'
+                };
+                document.getElementById('userName').textContent = userData.username;
                 showToast("Error loading user data", "error");
             }
         }
@@ -805,7 +871,7 @@
             const messageDiv = document.createElement('div');
             const isOwnMessage = message.uid === currentUser.uid;
             
-            messageDiv.className = `message ${isOwnMessage ? 'own-message' : ''}`;
+            messageDiv.className = `message ${isOwnMessage ? 'own-message' : ''} chat-message-enter`;
             
             // Format timestamp
             const timestamp = message.timestamp?.toDate();
@@ -968,7 +1034,7 @@
             if (unissuedCount > 0) {
                 assignmentSuggestions.innerHTML = `
                     <p>You have <strong>${unissuedCount}</strong> unissued members across your lists.</p>
-                    <button class="btn btn-theme btn-sm">Assign Recommended Issuers</button>
+                    <button class="btn btn-theme btn-sm" onclick="showToast('Bulk assignment feature would be implemented here', 'info')">Assign Recommended Issuers</button>
                 `;
             } else {
                 assignmentSuggestions.innerHTML = `<p class="text-success">All members have been assigned! Great work!</p>`;
@@ -1055,7 +1121,7 @@
 
         function showNotification(title, body) {
             if (Notification.permission === 'granted') {
-                new Notification(title, { body, icon: '/favicon.ico' });
+                new Notification(title, { body });
             }
         }
 
@@ -1268,14 +1334,24 @@
                 emojiPicker.style.display = emojiPicker.style.display === 'grid' ? 'none' : 'grid';
             });
             
-            // Send message
+            // Close emoji picker when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!emojiToggle.contains(e.target) && !emojiPicker.contains(e.target)) {
+                    emojiPicker.style.display = 'none';
+                }
+            });
+            
+            // Send message function - FIXED: Now properly accesses userData
             function sendMessage() {
                 const text = messageInput.value.trim();
                 if (!text) return;
                 
+                // Ensure userData is available
+                const username = window.userData?.username || currentUser?.email || 'Anonymous';
+                
                 const messageData = {
                     text: text,
-                    username: userData?.username || currentUser?.email || 'Anonymous',
+                    username: username,
                     uid: currentUser.uid,
                     timestamp: window.firebaseFunctions.serverTimestamp()
                 };
@@ -1365,6 +1441,10 @@
                 parsedData = [];
                 saveListBtn.disabled = true;
             });
+            
+            // Make userData globally available for chat functionality
+            window.userData = userData;
+            window.currentUser = currentUser;
         });
         
         function showPreview(data) {
@@ -1386,6 +1466,34 @@
             
             previewSection.classList.remove('d-none');
         }
+        
+        // Global function for toast notifications
+        window.showToast = function(message, type = 'info') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toastId = 'toast-' + Date.now();
+            
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-bg-${type === 'error' ? 'danger' : type} border-0`;
+            toast.id = toastId;
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
+            bsToast.show();
+            
+            // Remove from DOM after hide
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
+            });
+        };
     </script>
 </body>
 </html>
