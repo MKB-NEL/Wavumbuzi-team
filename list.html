@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WTM - List Management</title>
+    
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --wtm-accent: #0d6efd; /* Default color, will be updated dynamically */
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 0 0 12px 12px;
+        }
+        
+        .user-color-badge {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 8px;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+        }
+        
+        .main-content {
+            flex: 1;
+            padding: 2rem 0;
+        }
+        
+        .card {
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+        
+        .btn-theme {
+            background-color: var(--wtm-accent);
+            border-color: var(--wtm-accent);
+            color: white;
+        }
+        
+        .btn-theme:hover {
+            background-color: var(--wtm-accent);
+            border-color: var(--wtm-accent);
+            opacity: 0.9;
+            color: white;
+        }
+        
+        .text-theme {
+            color: var(--wtm-accent) !important;
+        }
+        
+        .progress-bar-theme {
+            background-color: var(--wtm-accent);
+        }
+        
+        .badge-theme {
+            background-color: var(--wtm-accent);
+        }
+        
+        .footer {
+            background-color: #fff;
+            padding: 1.5rem 0;
+            margin-top: auto;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+        }
+        
+        .footer a {
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        .footer a:hover {
+            color: var(--wtm-accent) !important;
+        }
+        
+        .issuer-pill {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-align: center;
+            min-width: 80px;
+        }
+        
+        .table-responsive {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .table th {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+        }
+        
+        .description-input {
+            width: 100%;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 0.875rem;
+        }
+        
+        .description-input:focus {
+            outline: none;
+            border-color: var(--wtm-accent);
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        
+        .user-option {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .user-option:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .user-option.selected {
+            background-color: #e7f1ff;
+            border: 1px solid var(--wtm-accent);
+        }
+        
+        .stats-card {
+            text-align: center;
+            padding: 15px;
+        }
+        
+        .stats-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1060;
+        }
+        
+        .pagination .page-link {
+            color: var(--wtm-accent);
+        }
+        
+        .pagination .page-item.active .page-link {
+            background-color: var(--wtm-accent);
+            border-color: var(--wtm-accent);
+        }
+        
+        .search-box {
+            max-width: 300px;
+        }
+        
+        .unissued-member {
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        
+        .unissued-member:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .unissued-member:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <!-- Header Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container">
+            <div class="d-flex align-items-center">
+                <a class="btn btn-outline-secondary btn-sm me-3" href="home.html">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+                <a class="navbar-brand fw-bold" href="#">
+                    <span class="text-theme">WTM</span> — Wavumbuzi Team Manager
+                </a>
+            </div>
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                        <span id="userName">User</span>
+                        <span class="user-color-badge" id="userColorBadge"></span>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" id="logoutBtn">Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h2" id="listTitle">Loading List...</h1>
+                    <div class="d-flex align-items-center mt-2">
+                        <span class="badge bg-secondary me-2" id="totalMembers">0 total</span>
+                        <span class="badge bg-success me-2" id="issuedMembers">0 issued</span>
+                        <span class="badge bg-warning" id="unissuedMembers">0 unissued</span>
+                    </div>
+                </div>
+                <div>
+                    <button class="btn btn-theme" id="exportCsv">
+                        <i class="bi bi-download me-1"></i>Export CSV
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="mb-4">
+                <div class="d-flex justify-content-between mb-1">
+                    <small>Issuance Progress</small>
+                    <small id="progressPercentage">0%</small>
+                </div>
+                <div class="progress" style="height: 10px;">
+                    <div class="progress-bar progress-bar-theme" role="progressbar" 
+                         id="progressBar" style="width: 0%;" 
+                         aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <!-- Main Table Column -->
+                <div class="col-lg-8">
+                    <!-- Search and Controls -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="input-group search-box">
+                                        <input type="text" class="form-control" id="searchInput" placeholder="Search by name...">
+                                        <button class="btn btn-outline-secondary" type="button" id="clearSearch">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 d-flex justify-content-end">
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-outline-secondary" id="filterAll">All</button>
+                                        <button type="button" class="btn btn-outline-secondary" id="filterUnissued">Unissued</button>
+                                        <button type="button" class="btn btn-outline-secondary" id="filterIssued">Issued</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Members Table -->
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="membersTable">
+                                    <thead>
+                                        <tr>
+                                            <th width="5%">#</th>
+                                            <th width="35%">NAMES</th>
+                                            <th width="25%">ISSUER</th>
+                                            <th width="35%">DESCRIPTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="membersTableBody">
+                                        <!-- Members will be populated here -->
+                                        <tr>
+                                            <td colspan="4" class="text-center py-4">
+                                                <div class="spinner-border text-theme" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <p class="mt-2">Loading list data...</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Pagination -->
+                            <nav aria-label="Members pagination" class="mt-3">
+                                <ul class="pagination justify-content-center" id="pagination">
+                                    <!-- Pagination will be generated here -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sidebar Column -->
+                <div class="col-lg-4">
+                    <!-- Quick Stats -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-transparent">
+                            <h5 class="card-title mb-0">List Statistics</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-6 mb-3">
+                                    <div class="stats-card">
+                                        <i class="bi bi-person-check text-success fs-4"></i>
+                                        <div class="stats-value" id="statsIssued">0</div>
+                                        <div class="text-muted">Issued</div>
+                                    </div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="stats-card">
+                                        <i class="bi bi-person-plus text-warning fs-4"></i>
+                                        <div class="stats-value" id="statsUnissued">0</div>
+                                        <div class="text-muted">Unissued</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="progress mb-2" style="height: 8px;">
+                                <div class="progress-bar progress-bar-theme" role="progressbar" 
+                                     id="statsProgressBar" style="width: 0%;" 
+                                     aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                            <small class="text-muted" id="statsPercentage">0% issued</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Unissued Members -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">Unissued Members</h5>
+                            <span class="badge bg-warning" id="unissuedCount">0</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="unissuedMembersList" style="max-height: 200px; overflow-y: auto;">
+                                <!-- Unissued members will be listed here -->
+                                <div class="text-center py-3 text-muted">
+                                    No unissued members
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Recommended Issuers -->
+                    <div class="card">
+                        <div class="card-header bg-transparent">
+                            <h5 class="card-title mb-0">Recommended Issuers</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="recommendedIssuers">
+                                <!-- Recommended issuers will be populated here -->
+                                <div class="text-center py-2 text-muted">
+                                    Loading recommendations...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Assign Issuer Modal -->
+    <div class="modal fade" id="assignModal" tabindex="-1" aria-labelledby="assignModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="assignModalLabel">Assign Issuer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">Select a user to assign as issuer for <strong id="assignMemberName">this member</strong>:</p>
+                    <div id="usersList" style="max-height: 300px; overflow-y: auto;">
+                        <!-- Users will be populated here -->
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-theme" role="status">
+                                <span class="visually-hidden">Loading users...</span>
+                            </div>
+                            <p class="mt-2">Loading users...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-theme" id="confirmAssign" disabled>
+                        <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        <span class="btn-text">Assign Issuer</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Assign Modal -->
+    <div class="modal fade" id="bulkAssignModal" tabindex="-1" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bulkAssignModalLabel">Bulk Assign</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Assign <strong id="bulkIssuerName">User</strong> to the next <input type="number" id="bulkAssignCount" class="form-control d-inline-block" style="width: 80px;" min="1" value="5"> unissued members?</p>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        This will assign the selected issuer to the specified number of unissued members starting from the top of the list.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-theme" id="confirmBulkAssign">
+                        <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        <span class="btn-text">Assign</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
+                <div class="mb-2 mb-md-0">
+                    <span class="text-muted">© 2025 Made by</span>
+                </div>
+                <div>
+                    <a href="https://github.com/mkb-nel" target="_blank" class="btn btn-outline-secondary btn-sm me-2">
+                        <i class="bi bi-github me-1"></i>GitHub
+                    </a>
+                    <a href="https://mkbertrand.vercel.app/" target="_blank" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-person-circle me-1"></i>Portfolio
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Required Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Firebase Integration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            getDocs, 
+            doc,
+            getDoc,
+            onSnapshot,
+            updateDoc,
+            runTransaction,
+            query,
+            where
+        } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged, 
+            signOut 
+        } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBbhxmAkHJtq3Zs17P4ewHsc8wi8-0M_XI",
+            authDomain: "developers-imw.firebasestorage.app",
+            projectId: "developers-imw",
+            storageBucket: "developers-imw.firebasestorage.app",
+            messagingSenderId: "182400720989",
+            appId: "1:182400720989:web:180f2390f7563f1ec96db4",
+            measurementId: "G-R7RDM0PMY8"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Global variables
+        let currentUser = null;
+        let userData = null;
+        let listId = null;
+        let listData = null;
+        let listUnsubscribe = null;
+        let allUsers = [];
+        let currentPage = 1;
+        const itemsPerPage = 10;
+        let filteredMembers = [];
+        let currentFilter = 'all';
+        let currentSearch = '';
+
+        // Auth state listener
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                await loadUserData(user);
+                
+                // Get listId from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                listId = urlParams.get('listId');
+                
+                if (!listId) {
+                    showToast("No list ID provided", "error");
+                    window.location.href = "home.html";
+                    return;
+                }
+                
+                // Load all users for assignment
+                await loadAllUsers();
+                
+                // Setup real-time listener for the list
+                setupListListener();
+            } else {
+                // Clean up listeners
+                if (listUnsubscribe) listUnsubscribe();
+                window.location.href = "index.html";
+            }
+        });
+
+        async function loadUserData(user) {
+            try {
+                // Get user document from Firestore
+                const userDocRef = doc(db, "users", user.uid);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    userData = userDoc.data();
+                    
+                    // Update UI with user data
+                    document.getElementById('userName').textContent = userData.username || user.email;
+                    
+                    // Apply user's preferred color theme
+                    if (userData.color) {
+                        applyUserTheme(userData.color);
+                    }
+                }
+            } catch (error) {
+                console.error("Error loading user data:", error);
+                showToast("Error loading user data", "error");
+            }
+        }
+
+        function applyUserTheme(color) {
+            // Update CSS custom property
+            document.documentElement.style.setProperty('--wtm-accent', color);
+            
+            // Update user color badge
+            document.getElementById('userColorBadge').style.backgroundColor = color;
+        }
+
+        async function loadAllUsers() {
+            try {
+                const usersQuery = collection(db, "users");
+                const querySnapshot = await getDocs(usersQuery);
+                
+                allUsers = [];
+                querySnapshot.forEach((doc) => {
+                    allUsers.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                // Sort by username
+                allUsers.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
+            } catch (error) {
+                console.error("Error loading users:", error);
+                showToast("Error loading users", "error");
+            }
+        }
+
+        function setupListListener() {
+            const listRef = doc(db, "lists", listId);
+            
+            listUnsubscribe = onSnapshot(listRef, (doc) => {
+                if (doc.exists()) {
+                    listData = doc.data();
+                    updateListUI();
+                } else {
+                    showToast("List not found", "error");
+                    setTimeout(() => {
+                        window.location.href = "home.html";
+                    }, 2000);
+                }
+            }, (error) => {
+                console.error("Error listening to list:", error);
+                showToast("Error loading list data", "error");
+            });
+        }
+
+        function updateListUI() {
+            // Update page title
+            document.getElementById('listTitle').textContent = listData.title || 'Untitled List';
+            
+            // Calculate stats
+            const totalMembers = listData.members?.length || 0;
+            const issuedMembers = listData.members?.filter(m => m.issuer).length || 0;
+            const unissuedMembers = totalMembers - issuedMembers;
+            const progressPercentage = totalMembers > 0 ? Math.round((issuedMembers / totalMembers) * 100) : 0;
+            
+            // Update header badges
+            document.getElementById('totalMembers').textContent = `${totalMembers} total`;
+            document.getElementById('issuedMembers').textContent = `${issuedMembers} issued`;
+            document.getElementById('unissuedMembers').textContent = `${unissuedMembers} unissued`;
+            
+            // Update progress bar
+            document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+            document.getElementById('progressPercentage').textContent = `${progressPercentage}%`;
+            
+            // Update stats card
+            document.getElementById('statsIssued').textContent = issuedMembers;
+            document.getElementById('statsUnissued').textContent = unissuedMembers;
+            document.getElementById('statsProgressBar').style.width = `${progressPercentage}%`;
+            document.getElementById('statsPercentage').textContent = `${progressPercentage}% issued`;
+            
+            // Filter and paginate members
+            filterAndPaginateMembers();
+            
+            // Update unissued members list
+            updateUnissuedMembersList();
+            
+            // Update recommended issuers
+            updateRecommendedIssuers();
+        }
+
+        function filterAndPaginateMembers() {
+            if (!listData.members) return;
+            
+            // Apply filters
+            filteredMembers = listData.members.filter(member => {
+                // Apply search filter
+                if (currentSearch) {
+                    const searchTerm = currentSearch.toLowerCase();
+                    const fullName = `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase();
+                    if (!fullName.includes(searchTerm)) {
+                        return false;
+                    }
+                }
+                
+                // Apply status filter
+                if (currentFilter === 'issued') {
+                    return member.issuer;
+                } else if (currentFilter === 'unissued') {
+                    return !member.issuer;
+                }
+                
+                return true;
+            });
+            
+            // Update pagination
+            updatePagination();
+            
+            // Render current page
+            renderCurrentPage();
+        }
+
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
+            const paginationElement = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                paginationElement.innerHTML = '';
+                return;
+            }
+            
+            let paginationHTML = '';
+            
+            // Previous button
+            paginationHTML += `
+                <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" data-page="${currentPage - 1}">Previous</a>
+                </li>
+            `;
+            
+            // Page numbers
+            for (let i = 1; i <= totalPages; i++) {
+                paginationHTML += `
+                    <li class="page-item ${currentPage === i ? 'active' : ''}">
+                        <a class="page-link" href="#" data-page="${i}">${i}</a>
+                    </li>
+                `;
+            }
+            
+            // Next button
+            paginationHTML += `
+                <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                    <a class="page-link" href="#" data-page="${currentPage + 1}">Next</a>
+                </li>
+            `;
+            
+            paginationElement.innerHTML = paginationHTML;
+            
+            // Add event listeners to pagination links
+            paginationElement.querySelectorAll('.page-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const page = parseInt(this.getAttribute('data-page'));
+                    if (page && page !== currentPage) {
+                        currentPage = page;
+                        renderCurrentPage();
+                    }
+                });
+            });
+        }
+
+        function renderCurrentPage() {
+            const tableBody = document.getElementById('membersTableBody');
+            
+            if (filteredMembers.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-muted">
+                            No members found matching your criteria
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            // Calculate start and end indices for current page
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = Math.min(startIndex + itemsPerPage, filteredMembers.length);
+            const currentMembers = filteredMembers.slice(startIndex, endIndex);
+            
+            let tableHTML = '';
+            
+            currentMembers.forEach((member, index) => {
+                const globalIndex = listData.members.indexOf(member);
+                const displayNumber = startIndex + index + 1;
+                
+                tableHTML += `
+                    <tr>
+                        <td>${displayNumber}</td>
+                        <td>${member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim()}</td>
+                        <td>
+                            ${renderIssuerCell(member, globalIndex)}
+                        </td>
+                        <td>
+                            ${renderDescriptionCell(member, globalIndex)}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tableBody.innerHTML = tableHTML;
+        }
+
+        function renderIssuerCell(member, index) {
+            if (member.issuer) {
+                // Calculate text color based on background brightness
+                const textColor = getContrastColor(member.issuer.color);
+                
+                return `
+                    <div class="issuer-pill" style="background-color: ${member.issuer.color}; color: ${textColor};">
+                        ${member.issuer.username}
+                    </div>
+                `;
+            } else {
+                return `
+                    <button class="btn btn-outline-primary btn-sm" onclick="openAssignModal(${index})">
+                        Assign
+                    </button>
+                `;
+            }
+        }
+
+        function renderDescriptionCell(member, index) {
+            return `
+                <input type="text" 
+                       class="description-input" 
+                       value="${member.description || ''}" 
+                       placeholder="Add description..."
+                       onchange="updateDescription(${index}, this.value)">
+            `;
+        }
+
+        function getContrastColor(hexColor) {
+            // Convert hex to RGB
+            const r = parseInt(hexColor.substr(1, 2), 16);
+            const g = parseInt(hexColor.substr(3, 2), 16);
+            const b = parseInt(hexColor.substr(5, 2), 16);
+            
+            // Calculate relative luminance
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            
+            // Return white for dark backgrounds, black for light backgrounds
+            return luminance > 0.5 ? '#000000' : '#FFFFFF';
+        }
+
+        function updateUnissuedMembersList() {
+            const unissuedMembersList = document.getElementById('unissuedMembersList');
+            const unissuedCount = document.getElementById('unissuedCount');
+            
+            const unissuedMembers = listData.members?.filter(m => !m.issuer) || [];
+            unissuedCount.textContent = unissuedMembers.length;
+            
+            if (unissuedMembers.length === 0) {
+                unissuedMembersList.innerHTML = `
+                    <div class="text-center py-3 text-muted">
+                        No unissued members
+                    </div>
+                `;
+                return;
+            }
+            
+            let listHTML = '';
+            unissuedMembers.slice(0, 10).forEach((member, index) => {
+                const globalIndex = listData.members.indexOf(member);
+                listHTML += `
+                    <div class="unissued-member" onclick="openAssignModal(${globalIndex})">
+                        ${member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim()}
+                    </div>
+                `;
+            });
+            
+            if (unissuedMembers.length > 10) {
+                listHTML += `
+                    <div class="text-center py-2 text-muted">
+                        +${unissuedMembers.length - 10} more
+                    </div>
+                `;
+            }
+            
+            unissuedMembersList.innerHTML = listHTML;
+        }
+
+        function updateRecommendedIssuers() {
+            const recommendedIssuersElement = document.getElementById('recommendedIssuers');
+            
+            // Simple recommendation algorithm: users with fewest assignments
+            const issuerCounts = {};
+            
+            // Count assignments per user
+            listData.members?.forEach(member => {
+                if (member.issuer) {
+                    issuerCounts[member.issuer.uid] = (issuerCounts[member.issuer.uid] || 0) + 1;
+                }
+            });
+            
+            // Sort users by assignment count (ascending)
+            const sortedUsers = [...allUsers].sort((a, b) => {
+                const countA = issuerCounts[a.id] || 0;
+                const countB = issuerCounts[b.id] || 0;
+                return countA - countB;
+            });
+            
+            // Take top 3 recommendations
+            const topRecommendations = sortedUsers.slice(0, 3);
+            
+            if (topRecommendations.length === 0) {
+                recommendedIssuersElement.innerHTML = `
+                    <div class="text-center py-2 text-muted">
+                        No users available for assignment
+                    </div>
+                `;
+                return;
+            }
+            
+            let recommendationsHTML = '';
+            topRecommendations.forEach(user => {
+                const assignmentCount = issuerCounts[user.id] || 0;
+                recommendationsHTML += `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center">
+                            <span class="user-color-badge me-2" style="background-color: ${user.color || '#6c757d'};"></span>
+                            <span>${user.username}</span>
+                        </div>
+                        <div>
+                            <span class="badge bg-secondary me-2">${assignmentCount}</span>
+                            <button class="btn btn-theme btn-sm" onclick="openBulkAssignModal('${user.id}', '${user.username}', '${user.color}')">
+                                Assign
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            recommendedIssuersElement.innerHTML = recommendationsHTML;
+        }
+
+        // TODO: Implement Firestore security rules to:
+        // - Only allow list owners to modify the list
+        // - Prevent changing issuer once it's set (only allow setting from null → object)
+        // - Validate data structure and sizes
+
+        // Make functions available globally
+        window.openAssignModal = function(memberIndex) {
+            const member = listData.members[memberIndex];
+            
+            // Check if already assigned (shouldn't happen due to UI, but just in case)
+            if (member.issuer) {
+                showToast("This member is already assigned", "warning");
+                return;
+            }
+            
+            // Store the member index for later use
+            document.getElementById('assignModal').setAttribute('data-member-index', memberIndex);
+            document.getElementById('assignMemberName').textContent = 
+                member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim();
+            
+            // Populate users list
+            const usersListElement = document.getElementById('usersList');
+            let usersHTML = '';
+            
+            allUsers.forEach(user => {
+                usersHTML += `
+                    <div class="user-option" data-user-id="${user.id}">
+                        <span class="user-color-badge me-2" style="background-color: ${user.color || '#6c757d'};"></span>
+                        <span>${user.username}</span>
+                    </div>
+                `;
+            });
+            
+            usersListElement.innerHTML = usersHTML;
+            
+            // Add click handlers to user options
+            usersListElement.querySelectorAll('.user-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    // Remove selection from all options
+                    usersListElement.querySelectorAll('.user-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    
+                    // Select this option
+                    this.classList.add('selected');
+                    
+                    // Enable confirm button
+                    document.getElementById('confirmAssign').disabled = false;
+                });
+            });
+            
+            // Reset confirm button
+            document.getElementById('confirmAssign').disabled = true;
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('assignModal'));
+            modal.show();
+        };
+
+        window.updateDescription = async function(memberIndex, newDescription) {
+            try {
+                const listRef = doc(db, "lists", listId);
+                const members = [...listData.members];
+                
+                // Update the description
+                members[memberIndex].description = newDescription;
+                
+                // Update Firestore
+                await updateDoc(listRef, {
+                    members: members
+                });
+                
+                showToast("Description updated", "success");
+            } catch (error) {
+                console.error("Error updating description:", error);
+                showToast("Error updating description", "error");
+            }
+        };
+
+        window.openBulkAssignModal = function(userId, username, color) {
+            document.getElementById('bulkAssignModal').setAttribute('data-user-id', userId);
+            document.getElementById('bulkAssignModal').setAttribute('data-user-color', color);
+            document.getElementById('bulkIssuerName').textContent = username;
+            
+            const modal = new bootstrap.Modal(document.getElementById('bulkAssignModal'));
+            modal.show();
+        };
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Search functionality
+            const searchInput = document.getElementById('searchInput');
+            const clearSearch = document.getElementById('clearSearch');
+            
+            let searchTimeout;
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    currentSearch = this.value;
+                    currentPage = 1;
+                    filterAndPaginateMembers();
+                }, 300);
+            });
+            
+            clearSearch.addEventListener('click', function() {
+                searchInput.value = '';
+                currentSearch = '';
+                currentPage = 1;
+                filterAndPaginateMembers();
+            });
+            
+            // Filter buttons
+            document.getElementById('filterAll').addEventListener('click', function() {
+                currentFilter = 'all';
+                currentPage = 1;
+                updateActiveFilterButton(this);
+                filterAndPaginateMembers();
+            });
+            
+            document.getElementById('filterUnissued').addEventListener('click', function() {
+                currentFilter = 'unissued';
+                currentPage = 1;
+                updateActiveFilterButton(this);
+                filterAndPaginateMembers();
+            });
+            
+            document.getElementById('filterIssued').addEventListener('click', function() {
+                currentFilter = 'issued';
+                currentPage = 1;
+                updateActiveFilterButton(this);
+                filterAndPaginateMembers();
+            });
+            
+            function updateActiveFilterButton(activeButton) {
+                // Remove active class from all filter buttons
+                document.querySelectorAll('#filterAll, #filterUnissued, #filterIssued').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                // Add active class to clicked button
+                activeButton.classList.add('active');
+            }
+            
+            // Assign issuer confirmation
+            document.getElementById('confirmAssign').addEventListener('click', async function() {
+                const modal = document.getElementById('assignModal');
+                const memberIndex = parseInt(modal.getAttribute('data-member-index'));
+                const selectedUserOption = document.querySelector('#usersList .user-option.selected');
+                
+                if (!selectedUserOption) {
+                    showToast("Please select a user", "error");
+                    return;
+                }
+                
+                const userId = selectedUserOption.getAttribute('data-user-id');
+                const user = allUsers.find(u => u.id === userId);
+                
+                if (!user) {
+                    showToast("Selected user not found", "error");
+                    return;
+                }
+                
+                // Show loading state
+                const spinner = this.querySelector('.spinner-border');
+                const btnText = this.querySelector('.btn-text');
+                
+                spinner.classList.remove('d-none');
+                btnText.textContent = 'Assigning...';
+                this.disabled = true;
+                
+                try {
+                    const listRef = doc(window.firebaseDb, "lists", listId);
+                    
+                    // Use transaction to prevent race conditions
+                    await window.firebaseFunctions.runTransaction(window.firebaseDb, async (transaction) => {
+                        const listDoc = await transaction.get(listRef);
+                        
+                        if (!listDoc.exists()) {
+                            throw new Error("List does not exist");
+                        }
+                        
+                        const listData = listDoc.data();
+                        const members = [...listData.members];
+                        
+                        // Check if member is already assigned
+                        if (members[memberIndex].issuer) {
+                            throw new Error("Member is already assigned");
+                        }
+                        
+                        // Update the member with issuer info
+                        members[memberIndex].issuer = {
+                            uid: user.id,
+                            username: user.username,
+                            color: user.color
+                        };
+                        
+                        // Update the transaction
+                        transaction.update(listRef, { members });
+                    });
+                    
+                    showToast("Issuer assigned successfully", "success");
+                    
+                    // Close modal
+                    const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                    bootstrapModal.hide();
+                    
+                } catch (error) {
+                    console.error("Error assigning issuer:", error);
+                    
+                    if (error.message === "Member is already assigned") {
+                        showToast("This member was already assigned by another user", "error");
+                    } else {
+                        showToast("Error assigning issuer", "error");
+                    }
+                } finally {
+                    // Reset button state
+                    spinner.classList.add('d-none');
+                    btnText.textContent = 'Assign Issuer';
+                    this.disabled = false;
+                }
+            });
+            
+            // Bulk assign confirmation
+            document.getElementById('confirmBulkAssign').addEventListener('click', async function() {
+                const modal = document.getElementById('bulkAssignModal');
+                const userId = modal.getAttribute('data-user-id');
+                const userColor = modal.getAttribute('data-user-color');
+                const user = allUsers.find(u => u.id === userId);
+                const count = parseInt(document.getElementById('bulkAssignCount').value) || 5;
+                
+                if (!user) {
+                    showToast("Selected user not found", "error");
+                    return;
+                }
+                
+                // Show loading state
+                const spinner = this.querySelector('.spinner-border');
+                const btnText = this.querySelector('.btn-text');
+                
+                spinner.classList.remove('d-none');
+                btnText.textContent = 'Assigning...';
+                this.disabled = true;
+                
+                try {
+                    const listRef = doc(window.firebaseDb, "lists", listId);
+                    const listDoc = await getDoc(listRef);
+                    
+                    if (!listDoc.exists()) {
+                        throw new Error("List does not exist");
+                    }
+                    
+                    const listData = listDoc.data();
+                    const members = [...listData.members];
+                    const unissuedMembers = members.filter(m => !m.issuer);
+                    
+                    if (unissuedMembers.length === 0) {
+                        showToast("No unissued members available", "warning");
+                        return;
+                    }
+                    
+                    const assignCount = Math.min(count, unissuedMembers.length);
+                    let assigned = 0;
+                    
+                    // Assign to the first N unissued members
+                    for (let i = 0; i < members.length && assigned < assignCount; i++) {
+                        if (!members[i].issuer) {
+                            members[i].issuer = {
+                                uid: user.id,
+                                username: user.username,
+                                color: user.color
+                            };
+                            assigned++;
+                        }
+                    }
+                    
+                    // Update Firestore
+                    await window.firebaseFunctions.updateDoc(listRef, { members });
+                    
+                    showToast(`Assigned ${assigned} members to ${user.username}`, "success");
+                    
+                    // Close modal
+                    const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                    bootstrapModal.hide();
+                    
+                } catch (error) {
+                    console.error("Error in bulk assignment:", error);
+                    showToast("Error assigning members", "error");
+                } finally {
+                    // Reset button state
+                    spinner.classList.add('d-none');
+                    btnText.textContent = 'Assign';
+                    this.disabled = false;
+                }
+            });
+            
+            // Export CSV
+            document.getElementById('exportCsv').addEventListener('click', function() {
+                if (!listData || !listData.members) {
+                    showToast("No data to export", "warning");
+                    return;
+                }
+                
+                // Create CSV content
+                let csvContent = "First Name,Last Name,Issuer,Description\n";
+                
+                listData.members.forEach(member => {
+                    const firstName = member.firstName || '';
+                    const lastName = member.lastName || '';
+                    const issuer = member.issuer ? member.issuer.username : '';
+                    const description = member.description || '';
+                    
+                    // Escape fields for CSV
+                    const escapeCsv = (field) => {
+                        if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+                            return `"${field.replace(/"/g, '""')}"`;
+                        }
+                        return field;
+                    };
+                    
+                    csvContent += `${escapeCsv(firstName)},${escapeCsv(lastName)},${escapeCsv(issuer)},${escapeCsv(description)}\n`;
+                });
+                
+                // Create download link
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', `${listData.title || 'list'}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showToast("CSV exported successfully", "success");
+            });
+            
+            // Logout functionality
+            document.getElementById('logoutBtn').addEventListener('click', async function() {
+                try {
+                    await window.firebaseFunctions.signOut(window.firebaseAuth);
+                    window.location.href = "index.html";
+                } catch (error) {
+                    console.error("Error signing out:", error);
+                    showToast("Error signing out", "error");
+                }
+            });
+            
+            // Reset modals when closed
+            document.getElementById('assignModal').addEventListener('hidden.bs.modal', function() {
+                this.removeAttribute('data-member-index');
+                document.getElementById('confirmAssign').disabled = true;
+            });
+            
+            document.getElementById('bulkAssignModal').addEventListener('hidden.bs.modal', function() {
+                this.removeAttribute('data-user-id');
+                this.removeAttribute('data-user-color');
+            });
+        });
+        
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toastId = 'toast-' + Date.now();
+            
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-bg-${type === 'error' ? 'danger' : type} border-0`;
+            toast.id = toastId;
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
+            bsToast.show();
+            
+            // Remove from DOM after hide
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
+            });
+        }
+    </script>
+</body>
+</html>
