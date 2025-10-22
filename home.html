@@ -398,7 +398,7 @@
                 <!-- LIST Tab -->
                 <div class="tab-pane fade" id="list" role="tabpanel" aria-labelledby="list-tab">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h2 class="h4 mb-0">Your Lists</h2>
+                        <h2 class="h4 mb-0">Team Lists</h2>
                     </div>
                     
                     <!-- Batch Actions Toolbar -->
@@ -1147,8 +1147,8 @@
                 }
             });
             
-            // User's lists
-            const listsQuery = query(collection(db, "lists"), where("ownerUid", "==", AppState.currentUser.uid));
+            // All team lists (removed owner filter)
+            const listsQuery = query(collection(db, "lists"));
             AppState.listsUnsubscribe = onSnapshot(listsQuery, (snapshot) => {
                 const listsContainer = document.getElementById('listsContainer');
                 
