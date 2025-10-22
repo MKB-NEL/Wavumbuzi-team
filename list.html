@@ -512,6 +512,15 @@
         let currentFilter = 'all';
         let currentSearch = '';
 
+        // Make functions available globally
+        window.listManager = {
+            openAssignModal,
+            updateDescription,
+            openBulkAssignModal,
+            filterAndPaginateMembers,
+            showToast
+        };
+
         // Auth state listener
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -780,7 +789,7 @@
                 `;
             } else {
                 return `
-                    <button class="btn btn-outline-primary btn-sm" onclick="openAssignModal(${index})">
+                    <button class="btn btn-outline-primary btn-sm" onclick="listManager.openAssignModal(${index})">
                         Assign
                     </button>
                 `;
@@ -793,7 +802,7 @@
                        class="description-input" 
                        value="${member.description || ''}" 
                        placeholder="Add description..."
-                       onchange="updateDescription(${index}, this.value)">
+                       onchange="listManager.updateDescription(${index}, this.value)">
             `;
         }
 
@@ -826,20 +835,22 @@
                 return;
             }
             
+            // Only show the count, not the actual names
             let listHTML = '';
-            unissuedMembers.slice(0, 10).forEach((member, index) => {
+            unissuedMembers.slice(0, 5).forEach((member, index) => {
                 const globalIndex = listData.members.indexOf(member);
                 listHTML += `
-                    <div class="unissued-member" onclick="openAssignModal(${globalIndex})">
-                        ${member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim()}
+                    <div class="unissued-member" onclick="listManager.openAssignModal(${globalIndex})">
+                        <i class="bi bi-person me-2"></i>
+                        Member ${globalIndex + 1}
                     </div>
                 `;
             });
             
-            if (unissuedMembers.length > 10) {
+            if (unissuedMembers.length > 5) {
                 listHTML += `
                     <div class="text-center py-2 text-muted">
-                        +${unissuedMembers.length - 10} more
+                        +${unissuedMembers.length - 5} more unissued members
                     </div>
                 `;
             }
@@ -890,7 +901,7 @@
                         </div>
                         <div>
                             <span class="badge bg-secondary me-2">${assignmentCount}</span>
-                            <button class="btn btn-theme btn-sm" onclick="openBulkAssignModal('${user.id}', '${user.username}', '${user.color}')">
+                            <button class="btn btn-theme btn-sm" onclick="listManager.openBulkAssignModal('${user.id}', '${user.username}', '${user.color}')">
                                 Assign
                             </button>
                         </div>
@@ -901,13 +912,8 @@
             recommendedIssuersElement.innerHTML = recommendationsHTML;
         }
 
-        // TODO: Implement Firestore security rules to:
-        // - Only allow list owners to modify the list
-        // - Prevent changing issuer once it's set (only allow setting from null → object)
-        // - Validate data structure and sizes
-
-        // Make functions available globally
-        window.openAssignModal = function(memberIndex) {
+        // Modal functions
+        function openAssignModal(memberIndex) {
             const member = listData.members[memberIndex];
             
             // Check if already assigned (shouldn't happen due to UI, but just in case)
@@ -958,9 +964,9 @@
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('assignModal'));
             modal.show();
-        };
+        }
 
-        window.updateDescription = async function(memberIndex, newDescription) {
+        async function updateDescription(memberIndex, newDescription) {
             try {
                 const listRef = doc(db, "lists", listId);
                 const members = [...listData.members];
@@ -978,16 +984,43 @@
                 console.error("Error updating description:", error);
                 showToast("Error updating description", "error");
             }
-        };
+        }
 
-        window.openBulkAssignModal = function(userId, username, color) {
+        function openBulkAssignModal(userId, username, color) {
             document.getElementById('bulkAssignModal').setAttribute('data-user-id', userId);
             document.getElementById('bulkAssignModal').setAttribute('data-user-color', color);
             document.getElementById('bulkIssuerName').textContent = username;
             
             const modal = new bootstrap.Modal(document.getElementById('bulkAssignModal'));
             modal.show();
-        };
+        }
+
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toastId = 'toast-' + Date.now();
+            
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-bg-${type === 'error' ? 'danger' : type} border-0`;
+            toast.id = toastId;
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
+            bsToast.show();
+            
+            // Remove from DOM after hide
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
+            });
+        }
     </script>
 
     <script>
@@ -1002,7 +1035,7 @@
                 searchTimeout = setTimeout(() => {
                     currentSearch = this.value;
                     currentPage = 1;
-                    filterAndPaginateMembers();
+                    window.listManager.filterAndPaginateMembers();
                 }, 300);
             });
             
@@ -1010,7 +1043,7 @@
                 searchInput.value = '';
                 currentSearch = '';
                 currentPage = 1;
-                filterAndPaginateMembers();
+                window.listManager.filterAndPaginateMembers();
             });
             
             // Filter buttons
@@ -1018,21 +1051,21 @@
                 currentFilter = 'all';
                 currentPage = 1;
                 updateActiveFilterButton(this);
-                filterAndPaginateMembers();
+                window.listManager.filterAndPaginateMembers();
             });
             
             document.getElementById('filterUnissued').addEventListener('click', function() {
                 currentFilter = 'unissued';
                 currentPage = 1;
                 updateActiveFilterButton(this);
-                filterAndPaginateMembers();
+                window.listManager.filterAndPaginateMembers();
             });
             
             document.getElementById('filterIssued').addEventListener('click', function() {
                 currentFilter = 'issued';
                 currentPage = 1;
                 updateActiveFilterButton(this);
-                filterAndPaginateMembers();
+                window.listManager.filterAndPaginateMembers();
             });
             
             function updateActiveFilterButton(activeButton) {
@@ -1052,7 +1085,7 @@
                 const selectedUserOption = document.querySelector('#usersList .user-option.selected');
                 
                 if (!selectedUserOption) {
-                    showToast("Please select a user", "error");
+                    window.listManager.showToast("Please select a user", "error");
                     return;
                 }
                 
@@ -1060,7 +1093,7 @@
                 const user = allUsers.find(u => u.id === userId);
                 
                 if (!user) {
-                    showToast("Selected user not found", "error");
+                    window.listManager.showToast("Selected user not found", "error");
                     return;
                 }
                 
@@ -1073,10 +1106,10 @@
                 this.disabled = true;
                 
                 try {
-                    const listRef = doc(window.firebaseDb, "lists", listId);
+                    const listRef = doc(db, "lists", listId);
                     
                     // Use transaction to prevent race conditions
-                    await window.firebaseFunctions.runTransaction(window.firebaseDb, async (transaction) => {
+                    await runTransaction(db, async (transaction) => {
                         const listDoc = await transaction.get(listRef);
                         
                         if (!listDoc.exists()) {
@@ -1102,7 +1135,7 @@
                         transaction.update(listRef, { members });
                     });
                     
-                    showToast("Issuer assigned successfully", "success");
+                    window.listManager.showToast("Issuer assigned successfully", "success");
                     
                     // Close modal
                     const bootstrapModal = bootstrap.Modal.getInstance(modal);
@@ -1112,9 +1145,9 @@
                     console.error("Error assigning issuer:", error);
                     
                     if (error.message === "Member is already assigned") {
-                        showToast("This member was already assigned by another user", "error");
+                        window.listManager.showToast("This member was already assigned by another user", "error");
                     } else {
-                        showToast("Error assigning issuer", "error");
+                        window.listManager.showToast("Error assigning issuer", "error");
                     }
                 } finally {
                     // Reset button state
@@ -1133,7 +1166,7 @@
                 const count = parseInt(document.getElementById('bulkAssignCount').value) || 5;
                 
                 if (!user) {
-                    showToast("Selected user not found", "error");
+                    window.listManager.showToast("Selected user not found", "error");
                     return;
                 }
                 
@@ -1146,7 +1179,7 @@
                 this.disabled = true;
                 
                 try {
-                    const listRef = doc(window.firebaseDb, "lists", listId);
+                    const listRef = doc(db, "lists", listId);
                     const listDoc = await getDoc(listRef);
                     
                     if (!listDoc.exists()) {
@@ -1158,7 +1191,7 @@
                     const unissuedMembers = members.filter(m => !m.issuer);
                     
                     if (unissuedMembers.length === 0) {
-                        showToast("No unissued members available", "warning");
+                        window.listManager.showToast("No unissued members available", "warning");
                         return;
                     }
                     
@@ -1178,9 +1211,9 @@
                     }
                     
                     // Update Firestore
-                    await window.firebaseFunctions.updateDoc(listRef, { members });
+                    await updateDoc(listRef, { members });
                     
-                    showToast(`Assigned ${assigned} members to ${user.username}`, "success");
+                    window.listManager.showToast(`Assigned ${assigned} members to ${user.username}`, "success");
                     
                     // Close modal
                     const bootstrapModal = bootstrap.Modal.getInstance(modal);
@@ -1188,7 +1221,7 @@
                     
                 } catch (error) {
                     console.error("Error in bulk assignment:", error);
-                    showToast("Error assigning members", "error");
+                    window.listManager.showToast("Error assigning members", "error");
                 } finally {
                     // Reset button state
                     spinner.classList.add('d-none');
@@ -1200,7 +1233,7 @@
             // Export CSV
             document.getElementById('exportCsv').addEventListener('click', function() {
                 if (!listData || !listData.members) {
-                    showToast("No data to export", "warning");
+                    window.listManager.showToast("No data to export", "warning");
                     return;
                 }
                 
@@ -1235,17 +1268,17 @@
                 link.click();
                 document.body.removeChild(link);
                 
-                showToast("CSV exported successfully", "success");
+                window.listManager.showToast("CSV exported successfully", "success");
             });
             
             // Logout functionality
             document.getElementById('logoutBtn').addEventListener('click', async function() {
                 try {
-                    await window.firebaseFunctions.signOut(window.firebaseAuth);
+                    await signOut(auth);
                     window.location.href = "index.html";
                 } catch (error) {
                     console.error("Error signing out:", error);
-                    showToast("Error signing out", "error");
+                    window.listManager.showToast("Error signing out", "error");
                 }
             });
             
@@ -1260,33 +1293,6 @@
                 this.removeAttribute('data-user-color');
             });
         });
-        
-        function showToast(message, type = 'info') {
-            const toastContainer = document.getElementById('toastContainer');
-            const toastId = 'toast-' + Date.now();
-            
-            const toast = document.createElement('div');
-            toast.className = `toast align-items-center text-bg-${type === 'error' ? 'danger' : type} border-0`;
-            toast.id = toastId;
-            toast.innerHTML = `
-                <div class="d-flex">
-                    <div class="toast-body">
-                        ${message}
-                    </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                </div>
-            `;
-            
-            toastContainer.appendChild(toast);
-            
-            const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
-            bsToast.show();
-            
-            // Remove from DOM after hide
-            toast.addEventListener('hidden.bs.toast', () => {
-                toast.remove();
-            });
-        }
     </script>
 </body>
 </html>
