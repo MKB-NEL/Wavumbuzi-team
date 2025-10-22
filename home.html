@@ -712,7 +712,7 @@
             signOut
         };
 
-        // Global variables
+        // Global variables - make them available globally
         let currentUser = null;
         let userData = null;
         let chatUnsubscribe = null;
@@ -727,6 +727,10 @@
                 currentUser = user;
                 await loadUserData(user);
                 setupRealtimeListeners();
+                
+                // Make variables globally available after they're set
+                window.currentUser = currentUser;
+                window.userData = userData;
             } else {
                 // Clean up listeners
                 if (chatUnsubscribe) chatUnsubscribe();
@@ -983,20 +987,24 @@
             let totalLists = 0;
             let totalMembers = 0;
             let totalIssued = 0;
+            let totalUnissued = 0;
             
             listsSnapshot.forEach(doc => {
                 const list = doc.data();
                 totalLists++;
-                totalMembers += list.members?.length || 0;
-                totalIssued += list.members?.filter(m => m.issuer).length || 0;
+                const listMembers = list.members?.length || 0;
+                const listIssued = list.members?.filter(m => m.issuer).length || 0;
+                totalMembers += listMembers;
+                totalIssued += listIssued;
+                totalUnissued += (listMembers - listIssued);
             });
             
             document.getElementById('totalLists').textContent = totalLists;
             document.getElementById('totalMembers').textContent = totalMembers;
             document.getElementById('totalIssued').textContent = totalIssued;
             
-            // Update suggestions
-            updateSuggestions(listsSnapshot);
+            // Update suggestions with real data
+            updateSuggestions(listsSnapshot, totalUnissued);
         }
 
         function updateAnalyticsWithUsers(usersSnapshot) {
@@ -1004,70 +1012,120 @@
             // For now, we just update the user count which is already done
         }
 
-        function updateSuggestions(listsSnapshot) {
+        function updateSuggestions(listsSnapshot, totalUnissued) {
             const assignmentSuggestions = document.getElementById('assignmentSuggestions');
             const listSuggestions = document.getElementById('listSuggestions');
             const topIssuers = document.getElementById('topIssuers');
             
-            // Simple rule-based suggestions
-            let unissuedCount = 0;
+            // Calculate real suggestions from data
             const listsWithLowIssuance = [];
+            const issuerStats = {};
             
+            // Calculate issuer statistics and list performance
             listsSnapshot.forEach(doc => {
                 const list = doc.data();
                 const issued = list.members?.filter(m => m.issuer).length || 0;
                 const total = list.members?.length || 0;
                 const unissued = total - issued;
                 
-                unissuedCount += unissued;
+                // Track issuer assignments
+                list.members?.forEach(member => {
+                    if (member.issuer) {
+                        const issuerId = member.issuer.uid;
+                        issuerStats[issuerId] = {
+                            username: member.issuer.username,
+                            count: (issuerStats[issuerId]?.count || 0) + 1,
+                            color: member.issuer.color
+                        };
+                    }
+                });
                 
-                if (unissued > 0 && issued / total < 0.5) {
+                if (unissued > 0 && issued / total < 0.7) {
                     listsWithLowIssuance.push({
                         title: list.title,
                         unissued,
-                        total
+                        total,
+                        percentage: Math.round((issued / total) * 100)
                     });
                 }
             });
             
+            // Sort lists by issuance percentage (lowest first)
+            listsWithLowIssuance.sort((a, b) => a.percentage - b.percentage);
+            
+            // Sort issuers by assignment count (highest first)
+            const sortedIssuers = Object.values(issuerStats).sort((a, b) => b.count - a.count);
+            
             // Assignment suggestions
-            if (unissuedCount > 0) {
+            if (totalUnissued > 0) {
                 assignmentSuggestions.innerHTML = `
-                    <p>You have <strong>${unissuedCount}</strong> unissued members across your lists.</p>
-                    <button class="btn btn-theme btn-sm" onclick="showToast('Bulk assignment feature would be implemented here', 'info')">Assign Recommended Issuers</button>
+                    <p>You have <strong>${totalUnissued}</strong> unissued members across your lists.</p>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-theme btn-sm" onclick="showToast('Bulk assignment feature would be implemented here', 'info')">
+                            Assign Recommended Issuers
+                        </button>
+                        <small class="text-muted">Consider assigning to users with fewer current assignments</small>
+                    </div>
                 `;
             } else {
-                assignmentSuggestions.innerHTML = `<p class="text-success">All members have been assigned! Great work!</p>`;
+                assignmentSuggestions.innerHTML = `
+                    <p class="text-success">🎉 All members have been assigned! Great work!</p>
+                    <p class="text-muted small">Your team is fully allocated and ready to go.</p>
+                `;
             }
             
             // List prioritization suggestions
             if (listsWithLowIssuance.length > 0) {
-                let listHtml = '<p>Consider prioritizing these lists:</p><ul class="mb-0">';
+                let listHtml = '<p class="mb-3">Focus on these lists for better allocation:</p><div class="list-group">';
                 listsWithLowIssuance.slice(0, 3).forEach(list => {
-                    const percentage = Math.round(((list.total - list.unissued) / list.total) * 100);
-                    listHtml += `<li><strong>${list.title}</strong> - ${list.unissued} unissued (${percentage}% issued)</li>`;
+                    listHtml += `
+                        <div class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">${list.title}</h6>
+                                <small>${list.percentage}%</small>
+                            </div>
+                            <p class="mb-1">${list.unissued} unissued of ${list.total} total</p>
+                            <div class="progress" style="height: 4px;">
+                                <div class="progress-bar progress-bar-theme" style="width: ${list.percentage}%"></div>
+                            </div>
+                        </div>
+                    `;
                 });
-                listHtml += '</ul>';
+                listHtml += '</div>';
                 listSuggestions.innerHTML = listHtml;
             } else {
-                listSuggestions.innerHTML = `<p class="text-success">All lists have good issuance rates!</p>`;
+                listSuggestions.innerHTML = `
+                    <p class="text-success">✅ All lists have excellent issuance rates!</p>
+                    <p class="text-muted small">Your lists are well-managed and properly allocated.</p>
+                `;
             }
             
-            // Top issuers (simplified for now)
-            topIssuers.innerHTML = `
-                <div class="d-flex justify-content-between mb-2">
-                    <span>User A</span>
-                    <span class="badge bg-primary">42 assigned</span>
-                </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>User B</span>
-                    <span class="badge bg-primary">35 assigned</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span>User C</span>
-                    <span class="badge bg-primary">28 assigned</span>
-                </div>
-            `;
+            // Top issuers with real data
+            if (sortedIssuers.length > 0) {
+                let issuersHtml = '';
+                sortedIssuers.slice(0, 5).forEach((issuer, index) => {
+                    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '•';
+                    issuersHtml += `
+                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                            <div class="d-flex align-items-center">
+                                <span class="me-2">${medal}</span>
+                                <span class="user-color-badge me-2" style="background-color: ${issuer.color || '#6c757d'};"></span>
+                                <span>${issuer.username}</span>
+                            </div>
+                            <span class="badge bg-primary">${issuer.count}</span>
+                        </div>
+                    `;
+                });
+                topIssuers.innerHTML = issuersHtml;
+            } else {
+                topIssuers.innerHTML = `
+                    <div class="text-center py-3 text-muted">
+                        <i class="bi bi-info-circle fs-1"></i>
+                        <p class="mt-2">No assignment data yet</p>
+                        <small>Start assigning members to see top performers</small>
+                    </div>
+                `;
+            }
         }
 
         // Make functions available globally
@@ -1159,6 +1217,10 @@
     </script>
 
     <script>
+        // Global variables that will be set after Firebase initialization
+        let currentUser = null;
+        let userData = null;
+        
         document.addEventListener('DOMContentLoaded', function() {
             // Excel file handling
             const excelFileInput = document.getElementById('excelFile');
@@ -1341,13 +1403,21 @@
                 }
             });
             
-            // Send message function - FIXED: Now properly accesses userData
+            // Send message function - FIXED: Now properly accesses userData and currentUser
             function sendMessage() {
                 const text = messageInput.value.trim();
                 if (!text) return;
                 
-                // Ensure userData is available
-                const username = window.userData?.username || currentUser?.email || 'Anonymous';
+                // Use the globally available variables
+                const currentUser = window.currentUser;
+                const userData = window.userData;
+                
+                if (!currentUser) {
+                    showToast("Please sign in to send messages", "error");
+                    return;
+                }
+                
+                const username = userData?.username || currentUser?.email || 'Anonymous';
                 
                 const messageData = {
                     text: text,
@@ -1442,9 +1512,14 @@
                 saveListBtn.disabled = true;
             });
             
-            // Make userData globally available for chat functionality
-            window.userData = userData;
-            window.currentUser = currentUser;
+            // Update global variables when they become available
+            const checkAuthInterval = setInterval(() => {
+                if (window.currentUser && window.userData) {
+                    currentUser = window.currentUser;
+                    userData = window.userData;
+                    clearInterval(checkAuthInterval);
+                }
+            }, 100);
         });
         
         function showPreview(data) {
@@ -1493,6 +1568,19 @@
             toast.addEventListener('hidden.bs.toast', () => {
                 toast.remove();
             });
+        };
+        
+        // Global function to update batch actions
+        window.updateBatchActions = function() {
+            const batchActions = document.getElementById('batchActions');
+            const selectedCount = document.getElementById('selectedCount');
+            
+            if (window.selectedLists && window.selectedLists.size > 0) {
+                batchActions.style.display = 'block';
+                selectedCount.textContent = `${window.selectedLists.size} list${window.selectedLists.size > 1 ? 's' : ''} selected`;
+            } else {
+                batchActions.style.display = 'none';
+            }
         };
     </script>
 </body>
