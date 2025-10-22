@@ -300,40 +300,6 @@
                 transform: translateY(0);
             }
         }
-        
-        /* Improved loading states */
-        .loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 12px;
-            z-index: 10;
-        }
-        
-        /* Better responsive design */
-        @media (max-width: 768px) {
-            .nav-tabs-custom .nav-link {
-                padding: 10px 15px;
-                font-size: 0.9rem;
-            }
-            
-            .upload-btn {
-                bottom: 20px;
-                right: 20px;
-                width: 50px;
-                height: 50px;
-            }
-            
-            .chat-container {
-                height: 400px;
-            }
-        }
     </style>
 </head>
 <body>
@@ -511,8 +477,12 @@
                                 </div>
                                 <div class="card-body" id="assignmentSuggestions">
                                     <!-- Suggestions will be populated here -->
-                                    <div class="skeleton" style="height: 20px; width: 80%; margin-bottom: 10px;"></div>
-                                    <div class="skeleton" style="height: 20px; width: 60%;"></div>
+                                    <div class="text-center py-3">
+                                        <div class="spinner-border text-theme" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2">Loading suggestions...</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -523,8 +493,12 @@
                                 </div>
                                 <div class="card-body" id="listSuggestions">
                                     <!-- List suggestions will be populated here -->
-                                    <div class="skeleton" style="height: 20px; width: 70%; margin-bottom: 10px;"></div>
-                                    <div class="skeleton" style="height: 20px; width: 90%;"></div>
+                                    <div class="text-center py-3">
+                                        <div class="spinner-border text-theme" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2">Loading suggestions...</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -539,9 +513,12 @@
                                 </div>
                                 <div class="card-body" id="topIssuers">
                                     <!-- Top issuers will be populated here -->
-                                    <div class="skeleton" style="height: 20px; width: 100%; margin-bottom: 10px;"></div>
-                                    <div class="skeleton" style="height: 20px; width: 90%; margin-bottom: 10px;"></div>
-                                    <div class="skeleton" style="height: 20px; width: 80%;"></div>
+                                    <div class="text-center py-3">
+                                        <div class="spinner-border text-theme" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2">Loading issuer data...</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -653,6 +630,414 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+    <!-- Main Application Script -->
+    <script>
+        // Global application state
+        const AppState = {
+            currentUser: null,
+            userData: null,
+            selectedLists: new Set(),
+            replyingToMessage: null,
+            chatUnsubscribe: null,
+            listsUnsubscribe: null,
+            usersUnsubscribe: null
+        };
+
+        // Utility functions
+        const Utils = {
+            showToast(message, type = 'info') {
+                const toastContainer = document.getElementById('toastContainer');
+                const toastId = 'toast-' + Date.now();
+                
+                const toast = document.createElement('div');
+                toast.className = `toast align-items-center text-bg-${type === 'error' ? 'danger' : type} border-0`;
+                toast.id = toastId;
+                toast.innerHTML = `
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                `;
+                
+                toastContainer.appendChild(toast);
+                const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
+                bsToast.show();
+                
+                toast.addEventListener('hidden.bs.toast', () => toast.remove());
+            },
+
+            showPreview(data) {
+                const previewTableBody = document.getElementById('previewTableBody');
+                const totalRowsCount = document.getElementById('totalRowsCount');
+                const previewSection = document.getElementById('previewSection');
+                
+                previewTableBody.innerHTML = '';
+                totalRowsCount.textContent = data.length;
+                
+                const previewData = data.slice(0, 10);
+                previewData.forEach((row, index) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${row.firstName || ''}</td>
+                        <td>${row.lastName || ''}</td>
+                    `;
+                    previewTableBody.appendChild(tr);
+                });
+                
+                previewSection.classList.remove('d-none');
+            }
+        };
+
+        // Chat functionality
+        const ChatManager = {
+            init() {
+                this.messageInput = document.getElementById('messageInput');
+                this.sendMessageBtn = document.getElementById('sendMessage');
+                this.emojiToggle = document.getElementById('emojiToggle');
+                this.emojiPicker = document.getElementById('emojiPicker');
+                this.cancelReply = document.getElementById('cancelReply');
+                this.replyPreview = document.getElementById('replyPreview');
+                this.replyAuthor = document.getElementById('replyAuthor');
+                this.replyText = document.getElementById('replyText');
+                
+                this.setupEventListeners();
+                this.initEmojiPicker();
+            },
+
+            initEmojiPicker() {
+                const emojis = ['😀', '😂', '🥰', '😎', '🤔', '😮', '👍', '❤️', '🔥', '🎉', 
+                               '🙏', '👏', '💯', '🤝', '🚀', '💡', '🎯', '⭐', '🌈', '🍕',
+                               '☕', '📚', '💼', '🎨', '⚡', '🔑', '📈', '💪', '🙌', '😊'];
+                
+                emojis.forEach(emoji => {
+                    const emojiOption = document.createElement('div');
+                    emojiOption.className = 'emoji-option';
+                    emojiOption.textContent = emoji;
+                    emojiOption.addEventListener('click', () => {
+                        this.messageInput.value += emoji;
+                        this.messageInput.focus();
+                    });
+                    this.emojiPicker.appendChild(emojiOption);
+                });
+            },
+
+            setupEventListeners() {
+                this.emojiToggle.addEventListener('click', () => {
+                    this.emojiPicker.style.display = this.emojiPicker.style.display === 'grid' ? 'none' : 'grid';
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!this.emojiToggle.contains(e.target) && !this.emojiPicker.contains(e.target)) {
+                        this.emojiPicker.style.display = 'none';
+                    }
+                });
+
+                this.sendMessageBtn.addEventListener('click', () => this.sendMessage());
+                this.messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.sendMessage();
+                });
+
+                this.cancelReply.addEventListener('click', () => this.cancelReplyAction());
+            },
+
+            sendMessage() {
+                const text = this.messageInput.value.trim();
+                if (!text || !AppState.currentUser) {
+                    Utils.showToast("Please sign in to send messages", "error");
+                    return;
+                }
+
+                const messageData = {
+                    text: text,
+                    username: AppState.userData?.username || AppState.currentUser.email || 'Anonymous',
+                    uid: AppState.currentUser.uid,
+                    timestamp: window.firebaseFunctions.serverTimestamp()
+                };
+
+                if (AppState.replyingToMessage) {
+                    messageData.replyTo = {
+                        messageId: AppState.replyingToMessage.messageId,
+                        username: AppState.replyingToMessage.username,
+                        text: AppState.replyingToMessage.text
+                    };
+                }
+
+                window.firebaseFunctions.addDoc(
+                    window.firebaseFunctions.collection(window.firebaseDb, "chats"),
+                    messageData
+                ).then(() => {
+                    this.messageInput.value = '';
+                    this.cancelReplyAction();
+                }).catch(error => {
+                    console.error("Error sending message:", error);
+                    Utils.showToast("Error sending message", "error");
+                });
+            },
+
+            cancelReplyAction() {
+                this.replyPreview.classList.add('d-none');
+                AppState.replyingToMessage = null;
+            },
+
+            replyToMessage(messageId, username, text) {
+                AppState.replyingToMessage = { messageId, username, text };
+                this.replyAuthor.textContent = username;
+                this.replyText.textContent = text.length > 50 ? text.substring(0, 50) + '...' : text;
+                this.replyPreview.classList.remove('d-none');
+                this.messageInput.focus();
+            }
+        };
+
+        // List management functionality
+        const ListManager = {
+            init() {
+                this.setupEventListeners();
+            },
+
+            setupEventListeners() {
+                document.getElementById('downloadSelected').addEventListener('click', () => this.downloadSelected());
+                document.getElementById('confirmDelete').addEventListener('click', () => this.deleteSelected());
+            },
+
+            downloadSelected() {
+                if (AppState.selectedLists.size === 0) return;
+                Utils.showToast(`Would download ${AppState.selectedLists.size} selected lists`, "info");
+            },
+
+            async deleteSelected() {
+                if (AppState.selectedLists.size === 0) return;
+                
+                try {
+                    for (const listId of AppState.selectedLists) {
+                        await window.firebaseFunctions.deleteDoc(
+                            window.firebaseFunctions.doc(window.firebaseDb, "lists", listId)
+                        );
+                    }
+                    
+                    Utils.showToast(`${AppState.selectedLists.size} list(s) deleted`, "success");
+                    AppState.selectedLists.clear();
+                    this.updateBatchActions();
+                    
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+                    modal.hide();
+                } catch (error) {
+                    console.error("Error deleting lists:", error);
+                    Utils.showToast("Error deleting lists", "error");
+                }
+            },
+
+            updateBatchActions() {
+                const batchActions = document.getElementById('batchActions');
+                const selectedCount = document.getElementById('selectedCount');
+                
+                if (AppState.selectedLists.size > 0) {
+                    batchActions.style.display = 'block';
+                    selectedCount.textContent = `${AppState.selectedLists.size} list${AppState.selectedLists.size > 1 ? 's' : ''} selected`;
+                } else {
+                    batchActions.style.display = 'none';
+                }
+            }
+        };
+
+        // File upload functionality
+        const FileUploadManager = {
+            init() {
+                this.excelFileInput = document.getElementById('excelFile');
+                this.previewSection = document.getElementById('previewSection');
+                this.saveListBtn = document.getElementById('saveListBtn');
+                this.listTitleInput = document.getElementById('listTitle');
+                this.uploadForm = document.getElementById('uploadForm');
+                this.parsedData = [];
+                
+                this.setupEventListeners();
+            },
+
+            setupEventListeners() {
+                this.excelFileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+                this.listTitleInput.addEventListener('input', () => this.validateForm());
+                this.saveListBtn.addEventListener('click', () => this.saveList());
+                
+                document.getElementById('uploadModal').addEventListener('hidden.bs.modal', () => {
+                    this.uploadForm.reset();
+                    this.previewSection.classList.add('d-none');
+                    this.parsedData = [];
+                    this.saveListBtn.disabled = true;
+                });
+            },
+
+            handleFileSelect(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                this.parsedData = [];
+                document.getElementById('previewTableBody').innerHTML = '';
+                this.previewSection.classList.add('d-none');
+                this.saveListBtn.disabled = true;
+
+                const reader = new FileReader();
+                reader.onload = (e) => this.parseExcelFile(e, file);
+                reader.onerror = () => Utils.showToast("Error reading file", "error");
+                reader.readAsArrayBuffer(file);
+            },
+
+            parseExcelFile(e, file) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                    if (jsonData.length === 0) {
+                        Utils.showToast("The Excel file appears to be empty", "error");
+                        return;
+                    }
+
+                    const firstRow = jsonData[0];
+                    const hasLastName = Object.keys(firstRow).some(key => 
+                        key.toLowerCase().includes('last') && key.toLowerCase().includes('name'));
+                    const hasFirstName = Object.keys(firstRow).some(key => 
+                        key.toLowerCase().includes('first') && key.toLowerCase().includes('name'));
+
+                    if (!hasLastName || !hasFirstName) {
+                        Utils.showToast("Excel file must contain 'LAST NAME' and 'FIRST NAME' columns", "error");
+                        return;
+                    }
+
+                    this.parsedData = jsonData.map(row => {
+                        const lastNameKey = Object.keys(row).find(key => 
+                            key.toLowerCase().includes('last') && key.toLowerCase().includes('name'));
+                        const firstNameKey = Object.keys(row).find(key => 
+                            key.toLowerCase().includes('first') && key.toLowerCase().includes('name'));
+                        
+                        return {
+                            lastName: row[lastNameKey] || '',
+                            firstName: row[firstNameKey] || '',
+                            name: `${row[firstNameKey] || ''} ${row[lastNameKey] || ''}`.trim(),
+                            issuer: null,
+                            description: ""
+                        };
+                    }).filter(member => member.lastName || member.firstName);
+
+                    Utils.showPreview(this.parsedData);
+                    this.validateForm();
+
+                } catch (error) {
+                    console.error("Error parsing Excel file:", error);
+                    Utils.showToast("Error reading Excel file. Please check the format.", "error");
+                }
+            },
+
+            validateForm() {
+                this.saveListBtn.disabled = !this.listTitleInput.value.trim() || this.parsedData.length === 0;
+            },
+
+            async saveList() {
+                const title = this.listTitleInput.value.trim();
+                
+                if (!title || this.parsedData.length === 0) {
+                    Utils.showToast("Please provide a title and upload a valid file", "error");
+                    return;
+                }
+
+                const spinner = this.saveListBtn.querySelector('.spinner-border');
+                const btnText = this.saveListBtn.querySelector('.btn-text');
+                
+                spinner.classList.remove('d-none');
+                btnText.textContent = 'Saving...';
+                this.saveListBtn.disabled = true;
+
+                try {
+                    const user = window.firebaseAuth.currentUser;
+                    if (!user) {
+                        window.location.href = "index.html";
+                        return;
+                    }
+
+                    await window.firebaseFunctions.addDoc(
+                        window.firebaseFunctions.collection(window.firebaseDb, "lists"), {
+                        title: title,
+                        ownerUid: user.uid,
+                        createdAt: window.firebaseFunctions.serverTimestamp(),
+                        members: this.parsedData
+                    });
+
+                    Utils.showToast("List uploaded successfully!", "success");
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
+                    modal.hide();
+
+                } catch (error) {
+                    console.error("Error saving list:", error);
+                    Utils.showToast("Error saving list. Please try again.", "error");
+                } finally {
+                    spinner.classList.add('d-none');
+                    btnText.textContent = 'Upload & Save';
+                    this.saveListBtn.disabled = false;
+                }
+            }
+        };
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize managers
+            ChatManager.init();
+            ListManager.init();
+            FileUploadManager.init();
+
+            // Logout functionality
+            document.getElementById('logoutBtn').addEventListener('click', async function() {
+                try {
+                    await window.firebaseFunctions.signOut(window.firebaseAuth);
+                    window.location.href = "index.html";
+                } catch (error) {
+                    console.error("Error signing out:", error);
+                    Utils.showToast("Error signing out", "error");
+                }
+            });
+
+            // Make functions globally available
+            window.editMessage = async function(messageId, currentText) {
+                const newText = prompt("Edit your message:", currentText);
+                if (newText && newText !== currentText) {
+                    try {
+                        await window.firebaseFunctions.updateDoc(
+                            window.firebaseFunctions.doc(window.firebaseDb, "chats", messageId), {
+                            text: newText,
+                            edited: true,
+                            editedAt: window.firebaseFunctions.serverTimestamp()
+                        });
+                        Utils.showToast("Message updated", "success");
+                    } catch (error) {
+                        console.error("Error updating message:", error);
+                        Utils.showToast("Error updating message", "error");
+                    }
+                }
+            };
+
+            window.deleteMessage = async function(messageId) {
+                if (confirm("Are you sure you want to delete this message?")) {
+                    try {
+                        await window.firebaseFunctions.deleteDoc(
+                            window.firebaseFunctions.doc(window.firebaseDb, "chats", messageId));
+                        Utils.showToast("Message deleted", "success");
+                    } catch (error) {
+                        console.error("Error deleting message:", error);
+                        Utils.showToast("Error deleting message", "error");
+                    }
+                }
+            };
+
+            window.replyToMessage = function(messageId, username, text) {
+                ChatManager.replyToMessage(messageId, username, text);
+            };
+
+            // Request notification permission
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        });
+    </script>
+
     <!-- Firebase Integration -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
@@ -696,103 +1081,51 @@
         window.firebaseDb = db;
         window.firebaseAuth = auth;
         window.firebaseFunctions = {
-            collection,
-            addDoc,
-            getDocs,
-            query,
-            where,
-            doc,
-            getDoc,
-            onSnapshot,
-            serverTimestamp,
-            orderBy,
-            updateDoc,
-            deleteDoc,
-            runTransaction,
-            signOut
+            collection, addDoc, getDocs, query, where, doc, getDoc,
+            onSnapshot, serverTimestamp, orderBy, updateDoc, deleteDoc, runTransaction, signOut
         };
 
-        // Global variables - make them available globally
-        let currentUser = null;
-        let userData = null;
-        let chatUnsubscribe = null;
-        let listsUnsubscribe = null;
-        let usersUnsubscribe = null;
-        let selectedLists = new Set();
-        let replyingToMessage = null;
-
-        // Auth state listener
+        // Firebase initialization and real-time listeners
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                currentUser = user;
+                AppState.currentUser = user;
                 await loadUserData(user);
                 setupRealtimeListeners();
-                
-                // Make variables globally available after they're set
-                window.currentUser = currentUser;
-                window.userData = userData;
             } else {
-                // Clean up listeners
-                if (chatUnsubscribe) chatUnsubscribe();
-                if (listsUnsubscribe) listsUnsubscribe();
-                if (usersUnsubscribe) usersUnsubscribe();
-                
+                cleanupListeners();
                 window.location.href = "index.html";
             }
         });
 
         async function loadUserData(user) {
             try {
-                // Get user document from Firestore
                 const userDocRef = doc(db, "users", user.uid);
                 const userDoc = await getDoc(userDocRef);
                 
                 if (userDoc.exists()) {
-                    userData = userDoc.data();
+                    AppState.userData = userDoc.data();
+                    document.getElementById('userName').textContent = AppState.userData.username || user.email;
                     
-                    // Update UI with user data
-                    document.getElementById('userName').textContent = userData.username || user.email;
-                    
-                    // Apply user's preferred color theme
-                    if (userData.color) {
-                        applyUserTheme(userData.color);
+                    if (AppState.userData.color) {
+                        document.documentElement.style.setProperty('--wtm-accent', AppState.userData.color);
+                        document.getElementById('userColorBadge').style.backgroundColor = AppState.userData.color;
                     }
                 } else {
-                    // Create a default user data object if document doesn't exist
-                    userData = {
-                        username: user.email,
-                        color: '#0d6efd'
-                    };
+                    AppState.userData = { username: user.email, color: '#0d6efd' };
                     document.getElementById('userName').textContent = user.email;
                 }
             } catch (error) {
                 console.error("Error loading user data:", error);
-                // Create fallback user data
-                userData = {
-                    username: currentUser?.email || 'User',
-                    color: '#0d6efd'
-                };
-                document.getElementById('userName').textContent = userData.username;
-                showToast("Error loading user data", "error");
+                AppState.userData = { username: user.email, color: '#0d6efd' };
+                document.getElementById('userName').textContent = user.email;
+                Utils.showToast("Error loading user data", "error");
             }
         }
 
-        function applyUserTheme(color) {
-            // Update CSS custom property
-            document.documentElement.style.setProperty('--wtm-accent', color);
-            
-            // Update user color badge
-            document.getElementById('userColorBadge').style.backgroundColor = color;
-        }
-
         function setupRealtimeListeners() {
-            // Chat messages listener
-            const chatsQuery = query(
-                collection(db, "chats"),
-                orderBy("timestamp", "asc")
-            );
-            
-            chatUnsubscribe = onSnapshot(chatsQuery, (snapshot) => {
+            // Chat messages
+            const chatsQuery = query(collection(db, "chats"), orderBy("timestamp", "asc"));
+            AppState.chatUnsubscribe = onSnapshot(chatsQuery, (snapshot) => {
                 const chatContainer = document.getElementById('chatContainer');
                 chatContainer.innerHTML = '';
                 
@@ -802,32 +1135,24 @@
                     chatContainer.appendChild(messageElement);
                 });
                 
-                // Auto-scroll to bottom
                 chatContainer.scrollTop = chatContainer.scrollHeight;
                 
-                // Check for new messages to show notifications
                 if (document.hidden && Notification.permission === 'granted') {
                     const lastMessage = snapshot.docs[snapshot.docs.length - 1];
-                    if (lastMessage && lastMessage.data().uid !== currentUser.uid) {
-                        showNotification(
-                            `New message from ${lastMessage.data().username}`,
-                            lastMessage.data().text
-                        );
+                    if (lastMessage && lastMessage.data().uid !== AppState.currentUser.uid) {
+                        new Notification(`New message from ${lastMessage.data().username}`, { 
+                            body: lastMessage.data().text 
+                        });
                     }
                 }
             });
             
-            // User's lists listener
-            const listsQuery = query(
-                collection(db, "lists"),
-                where("ownerUid", "==", currentUser.uid)
-            );
-            
-            listsUnsubscribe = onSnapshot(listsQuery, (snapshot) => {
+            // User's lists
+            const listsQuery = query(collection(db, "lists"), where("ownerUid", "==", AppState.currentUser.uid));
+            AppState.listsUnsubscribe = onSnapshot(listsQuery, (snapshot) => {
                 const listsContainer = document.getElementById('listsContainer');
                 
                 if (snapshot.empty) {
-                    // Show empty state
                     listsContainer.innerHTML = `
                         <div class="col-12">
                             <div class="empty-state">
@@ -843,151 +1168,133 @@
                     return;
                 }
                 
-                // Clear container
                 listsContainer.innerHTML = '';
-                
-                // Add lists to the container
                 snapshot.forEach((doc) => {
                     const listData = doc.data();
                     const listId = doc.id;
-                    
                     const listCard = createListCard(listData, listId);
                     listsContainer.appendChild(listCard);
                 });
                 
-                // Update analytics
                 updateAnalytics(snapshot);
             });
             
-            // Users collection listener for analytics
+            // Users for analytics
             const usersQuery = query(collection(db, "users"));
-            
-            usersUnsubscribe = onSnapshot(usersQuery, (snapshot) => {
-                // Update total users count
+            AppState.usersUnsubscribe = onSnapshot(usersQuery, (snapshot) => {
                 document.getElementById('totalUsers').textContent = snapshot.size;
-                
-                // Update analytics with user data
-                updateAnalyticsWithUsers(snapshot);
             });
         }
 
+        function cleanupListeners() {
+            if (AppState.chatUnsubscribe) AppState.chatUnsubscribe();
+            if (AppState.listsUnsubscribe) AppState.listsUnsubscribe();
+            if (AppState.usersUnsubscribe) AppState.usersUnsubscribe();
+        }
+
         function createMessageElement(message, messageId) {
-            const messageDiv = document.createElement('div');
-            const isOwnMessage = message.uid === currentUser.uid;
-            
-            messageDiv.className = `message ${isOwnMessage ? 'own-message' : ''} chat-message-enter`;
-            
-            // Format timestamp
+            const isOwnMessage = message.uid === AppState.currentUser.uid;
             const timestamp = message.timestamp?.toDate();
             const timeString = timestamp ? timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now';
             
-            messageDiv.innerHTML = `
-                <div class="message-header">
-                    <strong>${message.username}</strong>
-                    <span class="ms-2">${timeString}</span>
-                    ${message.edited ? '<span class="ms-2 text-muted">(edited)</span>' : ''}
-                </div>
-                <div class="message-text">${message.text}</div>
-                ${message.replyTo ? 
-                    `<div class="reply-preview mt-2">
-                        <em>Replying to: ${message.replyTo.text}</em>
-                    </div>` : ''}
-                ${isOwnMessage ? `
-                    <div class="message-actions">
-                        <button class="btn btn-sm p-0 me-2 text-white" onclick="editMessage('${messageId}', '${message.text}')">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <button class="btn btn-sm p-0 text-white" onclick="deleteMessage('${messageId}')">
-                            <i class="bi bi-trash"></i>
-                        </button>
+            return createElement('div', {
+                className: `message ${isOwnMessage ? 'own-message' : ''} chat-message-enter`,
+                innerHTML: `
+                    <div class="message-header">
+                        <strong>${message.username}</strong>
+                        <span class="ms-2">${timeString}</span>
+                        ${message.edited ? '<span class="ms-2 text-muted">(edited)</span>' : ''}
                     </div>
-                ` : `
-                    <div class="message-actions">
-                        <button class="btn btn-sm p-0 me-2" onclick="replyToMessage('${messageId}', '${message.username}', '${message.text}')">
-                            <i class="bi bi-reply"></i>
-                        </button>
-                    </div>
-                `}
-            `;
-            
-            return messageDiv;
+                    <div class="message-text">${message.text}</div>
+                    ${message.replyTo ? 
+                        `<div class="reply-preview mt-2"><em>Replying to: ${message.replyTo.text}</em></div>` : ''}
+                    ${isOwnMessage ? `
+                        <div class="message-actions">
+                            <button class="btn btn-sm p-0 me-2 text-white" onclick="editMessage('${messageId}', '${message.text}')">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm p-0 text-white" onclick="deleteMessage('${messageId}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    ` : `
+                        <div class="message-actions">
+                            <button class="btn btn-sm p-0 me-2" onclick="replyToMessage('${messageId}', '${message.username}', '${message.text}')">
+                                <i class="bi bi-reply"></i>
+                            </button>
+                        </div>
+                    `}
+                `
+            });
         }
 
         function createListCard(listData, listId) {
-            const col = document.createElement('div');
-            col.className = 'col-md-6 col-lg-4 mb-4';
-            
             const formattedDate = listData.createdAt?.toDate 
                 ? new Date(listData.createdAt.toDate()).toLocaleDateString() 
                 : 'Unknown date';
             
-            // Calculate issued members
             const totalMembers = listData.members?.length || 0;
             const issuedMembers = listData.members?.filter(m => m.issuer).length || 0;
             const progressPercentage = totalMembers > 0 ? Math.round((issuedMembers / totalMembers) * 100) : 0;
             
-            col.innerHTML = `
-                <div class="card">
-                    <div class="card-body">
-                        <div class="form-check list-checkbox">
-                            <input class="form-check-input" type="checkbox" value="${listId}" id="listCheck-${listId}">
-                        </div>
-                        <h5 class="card-title">${listData.title || 'Untitled List'}</h5>
-                        <p class="card-text text-muted small">
-                            <i class="bi bi-calendar me-1"></i>Created: ${formattedDate}
-                        </p>
-                        <p class="card-text">
-                            <span class="badge bg-secondary">${totalMembers} members</span>
-                            <span class="badge bg-success ms-1">${issuedMembers} issued</span>
-                        </p>
-                        <div class="progress mb-2" style="height: 8px;">
-                            <div class="progress-bar progress-bar-theme" role="progressbar" 
-                                 style="width: ${progressPercentage}%;" 
-                                 aria-valuenow="${progressPercentage}" aria-valuemin="0" aria-valuemax="100">
+            const col = createElement('div', {
+                className: 'col-md-6 col-lg-4 mb-4',
+                innerHTML: `
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="form-check list-checkbox">
+                                <input class="form-check-input" type="checkbox" value="${listId}" id="listCheck-${listId}">
                             </div>
+                            <h5 class="card-title">${listData.title || 'Untitled List'}</h5>
+                            <p class="card-text text-muted small">
+                                <i class="bi bi-calendar me-1"></i>Created: ${formattedDate}
+                            </p>
+                            <p class="card-text">
+                                <span class="badge bg-secondary">${totalMembers} members</span>
+                                <span class="badge bg-success ms-1">${issuedMembers} issued</span>
+                            </p>
+                            <div class="progress mb-2" style="height: 8px;">
+                                <div class="progress-bar progress-bar-theme" role="progressbar" 
+                                     style="width: ${progressPercentage}%;" 
+                                     aria-valuenow="${progressPercentage}" aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                            <small class="text-muted">${progressPercentage}% issued</small>
                         </div>
-                        <small class="text-muted">${progressPercentage}% issued</small>
+                        <div class="card-footer bg-transparent">
+                            <a href="list.html?listId=${listId}" class="btn btn-theme btn-sm">
+                                <i class="bi bi-folder-open me-1"></i>Open List
+                            </a>
+                        </div>
                     </div>
-                    <div class="card-footer bg-transparent">
-                        <a href="list.html?listId=${listId}" class="btn btn-theme btn-sm">
-                            <i class="bi bi-folder-open me-1"></i>Open List
-                        </a>
-                    </div>
-                </div>
-            `;
+                `
+            });
             
-            // Add checkbox event listener
             const checkbox = col.querySelector(`#listCheck-${listId}`);
             checkbox.addEventListener('change', function() {
                 if (this.checked) {
-                    selectedLists.add(listId);
+                    AppState.selectedLists.add(listId);
                 } else {
-                    selectedLists.delete(listId);
+                    AppState.selectedLists.delete(listId);
                 }
-                updateBatchActions();
+                ListManager.updateBatchActions();
             });
             
             return col;
         }
 
-        function updateBatchActions() {
-            const batchActions = document.getElementById('batchActions');
-            const selectedCount = document.getElementById('selectedCount');
-            
-            if (selectedLists.size > 0) {
-                batchActions.style.display = 'block';
-                selectedCount.textContent = `${selectedLists.size} list${selectedLists.size > 1 ? 's' : ''} selected`;
-            } else {
-                batchActions.style.display = 'none';
-            }
+        function createElement(tag, options) {
+            const element = document.createElement(tag);
+            Object.assign(element, options);
+            return element;
         }
 
         function updateAnalytics(listsSnapshot) {
-            // Calculate analytics from lists
             let totalLists = 0;
             let totalMembers = 0;
             let totalIssued = 0;
-            let totalUnissued = 0;
+            const issuerStats = {};
+            const listsWithLowIssuance = [];
             
             listsSnapshot.forEach(doc => {
                 const list = doc.data();
@@ -996,39 +1303,8 @@
                 const listIssued = list.members?.filter(m => m.issuer).length || 0;
                 totalMembers += listMembers;
                 totalIssued += listIssued;
-                totalUnissued += (listMembers - listIssued);
-            });
-            
-            document.getElementById('totalLists').textContent = totalLists;
-            document.getElementById('totalMembers').textContent = totalMembers;
-            document.getElementById('totalIssued').textContent = totalIssued;
-            
-            // Update suggestions with real data
-            updateSuggestions(listsSnapshot, totalUnissued);
-        }
-
-        function updateAnalyticsWithUsers(usersSnapshot) {
-            // This would be enhanced with user-specific analytics
-            // For now, we just update the user count which is already done
-        }
-
-        function updateSuggestions(listsSnapshot, totalUnissued) {
-            const assignmentSuggestions = document.getElementById('assignmentSuggestions');
-            const listSuggestions = document.getElementById('listSuggestions');
-            const topIssuers = document.getElementById('topIssuers');
-            
-            // Calculate real suggestions from data
-            const listsWithLowIssuance = [];
-            const issuerStats = {};
-            
-            // Calculate issuer statistics and list performance
-            listsSnapshot.forEach(doc => {
-                const list = doc.data();
-                const issued = list.members?.filter(m => m.issuer).length || 0;
-                const total = list.members?.length || 0;
-                const unissued = total - issued;
                 
-                // Track issuer assignments
+                // Track issuer statistics
                 list.members?.forEach(member => {
                     if (member.issuer) {
                         const issuerId = member.issuer.uid;
@@ -1040,28 +1316,38 @@
                     }
                 });
                 
-                if (unissued > 0 && issued / total < 0.7) {
+                // Track lists needing attention
+                const unissued = listMembers - listIssued;
+                if (unissued > 0 && listIssued / listMembers < 0.7) {
                     listsWithLowIssuance.push({
                         title: list.title,
                         unissued,
-                        total,
-                        percentage: Math.round((issued / total) * 100)
+                        total: listMembers,
+                        percentage: Math.round((listIssued / listMembers) * 100)
                     });
                 }
             });
             
-            // Sort lists by issuance percentage (lowest first)
-            listsWithLowIssuance.sort((a, b) => a.percentage - b.percentage);
+            // Update metrics
+            document.getElementById('totalLists').textContent = totalLists;
+            document.getElementById('totalMembers').textContent = totalMembers;
+            document.getElementById('totalIssued').textContent = totalIssued;
             
-            // Sort issuers by assignment count (highest first)
-            const sortedIssuers = Object.values(issuerStats).sort((a, b) => b.count - a.count);
+            // Update suggestions
+            updateSuggestions(totalMembers - totalIssued, listsWithLowIssuance, issuerStats);
+        }
+
+        function updateSuggestions(totalUnissued, listsWithLowIssuance, issuerStats) {
+            const assignmentSuggestions = document.getElementById('assignmentSuggestions');
+            const listSuggestions = document.getElementById('listSuggestions');
+            const topIssuers = document.getElementById('topIssuers');
             
             // Assignment suggestions
             if (totalUnissued > 0) {
                 assignmentSuggestions.innerHTML = `
                     <p>You have <strong>${totalUnissued}</strong> unissued members across your lists.</p>
                     <div class="d-grid gap-2">
-                        <button class="btn btn-theme btn-sm" onclick="showToast('Bulk assignment feature would be implemented here', 'info')">
+                        <button class="btn btn-theme btn-sm" onclick="Utils.showToast('Bulk assignment feature would be implemented here', 'info')">
                             Assign Recommended Issuers
                         </button>
                         <small class="text-muted">Consider assigning to users with fewer current assignments</small>
@@ -1074,7 +1360,7 @@
                 `;
             }
             
-            // List prioritization suggestions
+            // List prioritization
             if (listsWithLowIssuance.length > 0) {
                 let listHtml = '<p class="mb-3">Focus on these lists for better allocation:</p><div class="list-group">';
                 listsWithLowIssuance.slice(0, 3).forEach(list => {
@@ -1100,7 +1386,8 @@
                 `;
             }
             
-            // Top issuers with real data
+            // Top issuers
+            const sortedIssuers = Object.values(issuerStats).sort((a, b) => b.count - a.count);
             if (sortedIssuers.length > 0) {
                 let issuersHtml = '';
                 sortedIssuers.slice(0, 5).forEach((issuer, index) => {
@@ -1127,461 +1414,6 @@
                 `;
             }
         }
-
-        // Make functions available globally
-        window.editMessage = async function(messageId, currentText) {
-            const newText = prompt("Edit your message:", currentText);
-            if (newText && newText !== currentText) {
-                try {
-                    await updateDoc(doc(db, "chats", messageId), {
-                        text: newText,
-                        edited: true,
-                        editedAt: serverTimestamp()
-                    });
-                    showToast("Message updated", "success");
-                } catch (error) {
-                    console.error("Error updating message:", error);
-                    showToast("Error updating message", "error");
-                }
-            }
-        };
-
-        window.deleteMessage = async function(messageId) {
-            if (confirm("Are you sure you want to delete this message?")) {
-                try {
-                    await deleteDoc(doc(db, "chats", messageId));
-                    showToast("Message deleted", "success");
-                } catch (error) {
-                    console.error("Error deleting message:", error);
-                    showToast("Error deleting message", "error");
-                }
-            }
-        };
-
-        window.replyToMessage = function(messageId, username, text) {
-            replyingToMessage = { messageId, username, text };
-            
-            const replyPreview = document.getElementById('replyPreview');
-            const replyAuthor = document.getElementById('replyAuthor');
-            const replyText = document.getElementById('replyText');
-            
-            replyAuthor.textContent = username;
-            replyText.textContent = text.length > 50 ? text.substring(0, 50) + '...' : text;
-            replyPreview.classList.remove('d-none');
-            
-            document.getElementById('messageInput').focus();
-        };
-
-        // Request notification permission
-        if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission();
-        }
-
-        function showNotification(title, body) {
-            if (Notification.permission === 'granted') {
-                new Notification(title, { body });
-            }
-        }
-
-        function showToast(message, type = 'info') {
-            const toastContainer = document.getElementById('toastContainer');
-            const toastId = 'toast-' + Date.now();
-            
-            const toast = document.createElement('div');
-            toast.className = `toast align-items-center text-bg-${type === 'error' ? 'danger' : type} border-0`;
-            toast.id = toastId;
-            toast.innerHTML = `
-                <div class="d-flex">
-                    <div class="toast-body">
-                        ${message}
-                    </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                </div>
-            `;
-            
-            toastContainer.appendChild(toast);
-            
-            const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
-            bsToast.show();
-            
-            // Remove from DOM after hide
-            toast.addEventListener('hidden.bs.toast', () => {
-                toast.remove();
-            });
-        }
-
-        // TODO: Implement Firestore security rules to:
-        // - Only allow owners to delete their lists
-        // - Only allow message authors to edit/delete their messages
-        // - Validate uploaded Excel data structure
-    </script>
-
-    <script>
-        // Global variables that will be set after Firebase initialization
-        let currentUser = null;
-        let userData = null;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            // Excel file handling
-            const excelFileInput = document.getElementById('excelFile');
-            const previewSection = document.getElementById('previewSection');
-            const previewTableBody = document.getElementById('previewTableBody');
-            const totalRowsCount = document.getElementById('totalRowsCount');
-            const saveListBtn = document.getElementById('saveListBtn');
-            const listTitleInput = document.getElementById('listTitle');
-            const uploadForm = document.getElementById('uploadForm');
-            
-            let parsedData = [];
-            
-            // Handle file selection
-            excelFileInput.addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                // Reset state
-                parsedData = [];
-                previewTableBody.innerHTML = '';
-                previewSection.classList.add('d-none');
-                saveListBtn.disabled = true;
-                
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        const workbook = XLSX.read(data, { type: 'array' });
-                        
-                        // Get first worksheet
-                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                        
-                        // Convert to JSON
-                        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                        
-                        if (jsonData.length === 0) {
-                            showToast("The Excel file appears to be empty", "error");
-                            return;
-                        }
-                        
-                        // Validate required columns
-                        const firstRow = jsonData[0];
-                        const hasLastName = Object.keys(firstRow).some(key => 
-                            key.toLowerCase().includes('last') && key.toLowerCase().includes('name'));
-                        const hasFirstName = Object.keys(firstRow).some(key => 
-                            key.toLowerCase().includes('first') && key.toLowerCase().includes('name'));
-                        
-                        if (!hasLastName || !hasFirstName) {
-                            showToast("Excel file must contain 'LAST NAME' and 'FIRST NAME' columns", "error");
-                            return;
-                        }
-                        
-                        // Process data
-                        parsedData = jsonData.map(row => {
-                            // Find the correct column names (case insensitive)
-                            const lastNameKey = Object.keys(row).find(key => 
-                                key.toLowerCase().includes('last') && key.toLowerCase().includes('name'));
-                            const firstNameKey = Object.keys(row).find(key => 
-                                key.toLowerCase().includes('first') && key.toLowerCase().includes('name'));
-                            
-                            return {
-                                lastName: row[lastNameKey] || '',
-                                firstName: row[firstNameKey] || '',
-                                name: `${row[firstNameKey] || ''} ${row[lastNameKey] || ''}`.trim(),
-                                issuer: null,
-                                description: ""
-                            };
-                        }).filter(member => member.lastName || member.firstName); // Remove empty rows
-                        
-                        // Show preview
-                        showPreview(parsedData);
-                        
-                        // Enable save button if title is provided
-                        saveListBtn.disabled = !listTitleInput.value.trim();
-                        
-                    } catch (error) {
-                        console.error("Error parsing Excel file:", error);
-                        showToast("Error reading Excel file. Please check the format.", "error");
-                    }
-                };
-                
-                reader.onerror = function() {
-                    showToast("Error reading file", "error");
-                };
-                
-                reader.readAsArrayBuffer(file);
-            });
-            
-            // Enable save button when title is entered
-            listTitleInput.addEventListener('input', function() {
-                saveListBtn.disabled = !this.value.trim() || parsedData.length === 0;
-            });
-            
-            // Save list to Firestore
-            saveListBtn.addEventListener('click', async function() {
-                const title = listTitleInput.value.trim();
-                
-                if (!title || parsedData.length === 0) {
-                    showToast("Please provide a title and upload a valid file", "error");
-                    return;
-                }
-                
-                // Show loading state
-                const spinner = this.querySelector('.spinner-border');
-                const btnText = this.querySelector('.btn-text');
-                
-                spinner.classList.remove('d-none');
-                btnText.textContent = 'Saving...';
-                this.disabled = true;
-                
-                try {
-                    const user = window.firebaseAuth.currentUser;
-                    if (!user) {
-                        window.location.href = "index.html";
-                        return;
-                    }
-                    
-                    // Save to Firestore
-                    const docRef = await window.firebaseFunctions.addDoc(
-                        window.firebaseFunctions.collection(window.firebaseDb, "lists"), {
-                        title: title,
-                        ownerUid: user.uid,
-                        createdAt: window.firebaseFunctions.serverTimestamp(),
-                        members: parsedData
-                    });
-                    
-                    // Success
-                    showToast("List uploaded successfully!", "success");
-                    
-                    // Close modal and reset form
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
-                    modal.hide();
-                    uploadForm.reset();
-                    previewSection.classList.add('d-none');
-                    
-                } catch (error) {
-                    console.error("Error saving list:", error);
-                    showToast("Error saving list. Please try again.", "error");
-                } finally {
-                    // Reset button state
-                    spinner.classList.add('d-none');
-                    btnText.textContent = 'Upload & Save';
-                    saveListBtn.disabled = false;
-                }
-            });
-            
-            // Chat functionality
-            const messageInput = document.getElementById('messageInput');
-            const sendMessageBtn = document.getElementById('sendMessage');
-            const emojiToggle = document.getElementById('emojiToggle');
-            const emojiPicker = document.getElementById('emojiPicker');
-            const cancelReply = document.getElementById('cancelReply');
-            
-            // Initialize emoji picker
-            const emojis = ['😀', '😂', '🥰', '😎', '🤔', '😮', '👍', '❤️', '🔥', '🎉', 
-                           '🙏', '👏', '💯', '🤝', '🚀', '💡', '🎯', '⭐', '🌈', '🍕',
-                           '☕', '📚', '💼', '🎨', '⚡', '🔑', '📈', '💪', '🙌', '😊'];
-            
-            emojis.forEach(emoji => {
-                const emojiOption = document.createElement('div');
-                emojiOption.className = 'emoji-option';
-                emojiOption.textContent = emoji;
-                emojiOption.addEventListener('click', () => {
-                    messageInput.value += emoji;
-                    messageInput.focus();
-                });
-                emojiPicker.appendChild(emojiOption);
-            });
-            
-            // Toggle emoji picker
-            emojiToggle.addEventListener('click', () => {
-                emojiPicker.style.display = emojiPicker.style.display === 'grid' ? 'none' : 'grid';
-            });
-            
-            // Close emoji picker when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!emojiToggle.contains(e.target) && !emojiPicker.contains(e.target)) {
-                    emojiPicker.style.display = 'none';
-                }
-            });
-            
-            // Send message function - FIXED: Now properly accesses userData and currentUser
-            function sendMessage() {
-                const text = messageInput.value.trim();
-                if (!text) return;
-                
-                // Use the globally available variables
-                const currentUser = window.currentUser;
-                const userData = window.userData;
-                
-                if (!currentUser) {
-                    showToast("Please sign in to send messages", "error");
-                    return;
-                }
-                
-                const username = userData?.username || currentUser?.email || 'Anonymous';
-                
-                const messageData = {
-                    text: text,
-                    username: username,
-                    uid: currentUser.uid,
-                    timestamp: window.firebaseFunctions.serverTimestamp()
-                };
-                
-                // Add reply data if replying to a message
-                if (replyingToMessage) {
-                    messageData.replyTo = {
-                        messageId: replyingToMessage.messageId,
-                        username: replyingToMessage.username,
-                        text: replyingToMessage.text
-                    };
-                }
-                
-                // Add to Firestore
-                window.firebaseFunctions.addDoc(
-                    window.firebaseFunctions.collection(window.firebaseDb, "chats"),
-                    messageData
-                ).then(() => {
-                    // Clear input and reply
-                    messageInput.value = '';
-                    cancelReply.click();
-                }).catch(error => {
-                    console.error("Error sending message:", error);
-                    showToast("Error sending message", "error");
-                });
-            }
-            
-            sendMessageBtn.addEventListener('click', sendMessage);
-            
-            messageInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    sendMessage();
-                }
-            });
-            
-            // Cancel reply
-            cancelReply.addEventListener('click', () => {
-                document.getElementById('replyPreview').classList.add('d-none');
-                replyingToMessage = null;
-            });
-            
-            // Batch actions
-            document.getElementById('downloadSelected').addEventListener('click', () => {
-                if (selectedLists.size === 0) return;
-                showToast("Download functionality would be implemented here", "info");
-                // TODO: Implement CSV download for selected lists
-            });
-            
-            document.getElementById('confirmDelete').addEventListener('click', async () => {
-                if (selectedLists.size === 0) return;
-                
-                try {
-                    for (const listId of selectedLists) {
-                        await window.firebaseFunctions.deleteDoc(
-                            window.firebaseFunctions.doc(window.firebaseDb, "lists", listId)
-                        );
-                    }
-                    
-                    showToast(`${selectedLists.size} list(s) deleted`, "success");
-                    selectedLists.clear();
-                    updateBatchActions();
-                    
-                    // Close modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
-                    modal.hide();
-                } catch (error) {
-                    console.error("Error deleting lists:", error);
-                    showToast("Error deleting lists", "error");
-                }
-            });
-            
-            // Logout functionality
-            document.getElementById('logoutBtn').addEventListener('click', async function() {
-                try {
-                    await window.firebaseFunctions.signOut(window.firebaseAuth);
-                    window.location.href = "index.html";
-                } catch (error) {
-                    console.error("Error signing out:", error);
-                    showToast("Error signing out", "error");
-                }
-            });
-            
-            // Reset modal when closed
-            document.getElementById('uploadModal').addEventListener('hidden.bs.modal', function() {
-                uploadForm.reset();
-                previewSection.classList.add('d-none');
-                parsedData = [];
-                saveListBtn.disabled = true;
-            });
-            
-            // Update global variables when they become available
-            const checkAuthInterval = setInterval(() => {
-                if (window.currentUser && window.userData) {
-                    currentUser = window.currentUser;
-                    userData = window.userData;
-                    clearInterval(checkAuthInterval);
-                }
-            }, 100);
-        });
-        
-        function showPreview(data) {
-            previewTableBody.innerHTML = '';
-            totalRowsCount.textContent = data.length;
-            
-            // Show first 10 rows
-            const previewData = data.slice(0, 10);
-            
-            previewData.forEach((row, index) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${row.firstName || ''}</td>
-                    <td>${row.lastName || ''}</td>
-                `;
-                previewTableBody.appendChild(tr);
-            });
-            
-            previewSection.classList.remove('d-none');
-        }
-        
-        // Global function for toast notifications
-        window.showToast = function(message, type = 'info') {
-            const toastContainer = document.getElementById('toastContainer');
-            const toastId = 'toast-' + Date.now();
-            
-            const toast = document.createElement('div');
-            toast.className = `toast align-items-center text-bg-${type === 'error' ? 'danger' : type} border-0`;
-            toast.id = toastId;
-            toast.innerHTML = `
-                <div class="d-flex">
-                    <div class="toast-body">
-                        ${message}
-                    </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                </div>
-            `;
-            
-            toastContainer.appendChild(toast);
-            
-            const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
-            bsToast.show();
-            
-            // Remove from DOM after hide
-            toast.addEventListener('hidden.bs.toast', () => {
-                toast.remove();
-            });
-        };
-        
-        // Global function to update batch actions
-        window.updateBatchActions = function() {
-            const batchActions = document.getElementById('batchActions');
-            const selectedCount = document.getElementById('selectedCount');
-            
-            if (window.selectedLists && window.selectedLists.size > 0) {
-                batchActions.style.display = 'block';
-                selectedCount.textContent = `${window.selectedLists.size} list${window.selectedLists.size > 1 ? 's' : ''} selected`;
-            } else {
-                batchActions.style.display = 'none';
-            }
-        };
     </script>
 </body>
 </html>
