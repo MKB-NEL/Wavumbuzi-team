@@ -550,7 +550,7 @@
                         <div class="mb-3">
                             <label for="excelFile" class="form-label">Excel File</label>
                             <input type="file" class="form-control" id="excelFile" accept=".xlsx, .xls" required>
-                            <div class="form-text">Your Excel file must have columns: <strong>LAST NAME</strong> and <strong>FIRST NAME</strong></div>
+                            <div class="form-text">Your Excel file must have columns: <strong>LAST NAME</strong>, <strong>FIRST NAME</strong> and <strong>EMAIL</strong></div>
                         </div>
                         
                         <!-- Preview Section -->
@@ -563,6 +563,7 @@
                                             <th>#</th>
                                             <th>First Name</th>
                                             <th>Last Name</th>
+                                            <th>Email</th>
                                         </tr>
                                     </thead>
                                     <tbody id="previewTableBody">
@@ -681,6 +682,7 @@
                         <td>${index + 1}</td>
                         <td>${row.firstName || ''}</td>
                         <td>${row.lastName || ''}</td>
+                        <td>${row.email || ''}</td>
                     `;
                     previewTableBody.appendChild(tr);
                 });
@@ -898,9 +900,11 @@
                         key.toLowerCase().includes('last') && key.toLowerCase().includes('name'));
                     const hasFirstName = Object.keys(firstRow).some(key => 
                         key.toLowerCase().includes('first') && key.toLowerCase().includes('name'));
+                    const hasEmail = Object.keys(firstRow).some(key => 
+                        key.toLowerCase().includes('email'));
 
-                    if (!hasLastName || !hasFirstName) {
-                        Utils.showToast("Excel file must contain 'LAST NAME' and 'FIRST NAME' columns", "error");
+                    if (!hasLastName || !hasFirstName || !hasEmail) {
+                        Utils.showToast("Excel file must contain 'LAST NAME', 'FIRST NAME' and 'EMAIL' columns", "error");
                         return;
                     }
 
@@ -909,10 +913,13 @@
                             key.toLowerCase().includes('last') && key.toLowerCase().includes('name'));
                         const firstNameKey = Object.keys(row).find(key => 
                             key.toLowerCase().includes('first') && key.toLowerCase().includes('name'));
+                        const emailKey = Object.keys(row).find(key => 
+                            key.toLowerCase().includes('email'));
                         
                         return {
                             lastName: row[lastNameKey] || '',
                             firstName: row[firstNameKey] || '',
+                            email: row[emailKey] || '',
                             name: `${row[firstNameKey] || ''} ${row[lastNameKey] || ''}`.trim(),
                             issuer: null,
                             description: ""
