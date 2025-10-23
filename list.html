@@ -491,7 +491,11 @@
             filterAndPaginateMembers,
             showToast,
             getListData: () => listData,
-            getAllUsers: () => allUsers
+            getAllUsers: () => allUsers,
+            assignIssuer,
+            bulkAssignIssuer,
+            exportCSV,
+            logout
         };
 
         // Auth state listener
@@ -925,6 +929,153 @@
             modal.show();
         }
 
+        // Assignment functions
+        async function assignIssuer(memberIndex, userId) {
+            try {
+                const user = allUsers.find(u => u.id === userId);
+                if (!user) {
+                    throw new Error("Selected user not found");
+                }
+
+                const listRef = doc(db, "lists", listId);
+                
+                // Use transaction to prevent race conditions
+                await runTransaction(db, async (transaction) => {
+                    const listDoc = await transaction.get(listRef);
+                    
+                    if (!listDoc.exists()) {
+                        throw new Error("List does not exist");
+                    }
+                    
+                    const listData = listDoc.data();
+                    const members = [...listData.members];
+                    
+                    // Check if member is already assigned
+                    if (members[memberIndex].issuer) {
+                        throw new Error("Member is already assigned");
+                    }
+                    
+                    // Update the member with issuer info
+                    members[memberIndex].issuer = {
+                        uid: user.id,
+                        username: user.username,
+                        color: user.color
+                    };
+                    
+                    // Update the transaction
+                    transaction.update(listRef, { members });
+                });
+                
+                return { success: true };
+            } catch (error) {
+                console.error("Error assigning issuer:", error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function bulkAssignIssuer(userId, count) {
+            try {
+                const user = allUsers.find(u => u.id === userId);
+                if (!user) {
+                    throw new Error("Selected user not found");
+                }
+
+                const listRef = doc(db, "lists", listId);
+                const listDoc = await getDoc(listRef);
+                
+                if (!listDoc.exists()) {
+                    throw new Error("List does not exist");
+                }
+                
+                const listData = listDoc.data();
+                const members = [...listData.members];
+                const unissuedMembers = members.filter(m => !m.issuer);
+                
+                if (unissuedMembers.length === 0) {
+                    throw new Error("No unissued members available");
+                }
+                
+                const assignCount = Math.min(count, unissuedMembers.length);
+                let assigned = 0;
+                
+                // Assign to the first N unissued members
+                for (let i = 0; i < members.length && assigned < assignCount; i++) {
+                    if (!members[i].issuer) {
+                        members[i].issuer = {
+                            uid: user.id,
+                            username: user.username,
+                            color: user.color
+                        };
+                        assigned++;
+                    }
+                }
+                
+                // Update Firestore
+                await updateDoc(listRef, { members });
+                
+                return { success: true, assigned: assigned };
+            } catch (error) {
+                console.error("Error in bulk assignment:", error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // Export function
+        function exportCSV() {
+            if (!listData || !listData.members) {
+                return { success: false, error: "No data to export" };
+            }
+            
+            try {
+                // Create CSV content
+                let csvContent = "First Name,Last Name,Issuer,Description\n";
+                
+                listData.members.forEach(member => {
+                    const firstName = member.firstName || '';
+                    const lastName = member.lastName || '';
+                    const issuer = member.issuer ? member.issuer.username : '';
+                    const description = member.description || '';
+                    
+                    // Escape fields for CSV
+                    const escapeCsv = (field) => {
+                        if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+                            return `"${field.replace(/"/g, '""')}"`;
+                        }
+                        return field;
+                    };
+                    
+                    csvContent += `${escapeCsv(firstName)},${escapeCsv(lastName)},${escapeCsv(issuer)},${escapeCsv(description)}\n`;
+                });
+                
+                // Create download link
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', `${listData.title || 'list'}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                return { success: true };
+            } catch (error) {
+                console.error("Error exporting CSV:", error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // Logout function
+        async function logout() {
+            try {
+                await signOut(auth);
+                window.location.href = "index.html";
+            } catch (error) {
+                console.error("Error signing out:", error);
+                throw error;
+            }
+        }
+
         function showToast(message, type = 'info') {
             const toastContainer = document.getElementById('toastContainer');
             const toastId = 'toast-' + Date.now();
@@ -1020,13 +1171,6 @@
                 }
                 
                 const userId = selectedUserOption.getAttribute('data-user-id');
-                const allUsers = window.listManager.getAllUsers();
-                const user = allUsers.find(u => u.id === userId);
-                
-                if (!user) {
-                    window.listManager.showToast("Selected user not found", "error");
-                    return;
-                }
                 
                 // Show loading state
                 const spinner = this.querySelector('.spinner-border');
@@ -1037,49 +1181,25 @@
                 this.disabled = true;
                 
                 try {
-                    const listRef = doc(db, "lists", listId);
+                    const result = await window.listManager.assignIssuer(memberIndex, userId);
                     
-                    // Use transaction to prevent race conditions
-                    await runTransaction(db, async (transaction) => {
-                        const listDoc = await transaction.get(listRef);
+                    if (result.success) {
+                        window.listManager.showToast("Issuer assigned successfully", "success");
                         
-                        if (!listDoc.exists()) {
-                            throw new Error("List does not exist");
+                        // Close modal
+                        const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                        bootstrapModal.hide();
+                    } else {
+                        if (result.error === "Member is already assigned") {
+                            window.listManager.showToast("This member was already assigned by another user", "error");
+                        } else {
+                            window.listManager.showToast("Error assigning issuer: " + result.error, "error");
                         }
-                        
-                        const listData = listDoc.data();
-                        const members = [...listData.members];
-                        
-                        // Check if member is already assigned
-                        if (members[memberIndex].issuer) {
-                            throw new Error("Member is already assigned");
-                        }
-                        
-                        // Update the member with issuer info
-                        members[memberIndex].issuer = {
-                            uid: user.id,
-                            username: user.username,
-                            color: user.color
-                        };
-                        
-                        // Update the transaction
-                        transaction.update(listRef, { members });
-                    });
-                    
-                    window.listManager.showToast("Issuer assigned successfully", "success");
-                    
-                    // Close modal
-                    const bootstrapModal = bootstrap.Modal.getInstance(modal);
-                    bootstrapModal.hide();
+                    }
                     
                 } catch (error) {
                     console.error("Error assigning issuer:", error);
-                    
-                    if (error.message === "Member is already assigned") {
-                        window.listManager.showToast("This member was already assigned by another user", "error");
-                    } else {
-                        window.listManager.showToast("Error assigning issuer", "error");
-                    }
+                    window.listManager.showToast("Error assigning issuer", "error");
                 } finally {
                     // Reset button state
                     spinner.classList.add('d-none');
@@ -1092,14 +1212,7 @@
             document.getElementById('confirmBulkAssign').addEventListener('click', async function() {
                 const modal = document.getElementById('bulkAssignModal');
                 const userId = modal.getAttribute('data-user-id');
-                const allUsers = window.listManager.getAllUsers();
-                const user = allUsers.find(u => u.id === userId);
                 const count = parseInt(document.getElementById('bulkAssignCount').value) || 5;
-                
-                if (!user) {
-                    window.listManager.showToast("Selected user not found", "error");
-                    return;
-                }
                 
                 // Show loading state
                 const spinner = this.querySelector('.spinner-border');
@@ -1110,45 +1223,21 @@
                 this.disabled = true;
                 
                 try {
-                    const listRef = doc(db, "lists", listId);
-                    const listDoc = await getDoc(listRef);
+                    const result = await window.listManager.bulkAssignIssuer(userId, count);
                     
-                    if (!listDoc.exists()) {
-                        throw new Error("List does not exist");
-                    }
-                    
-                    const listData = listDoc.data();
-                    const members = [...listData.members];
-                    const unissuedMembers = members.filter(m => !m.issuer);
-                    
-                    if (unissuedMembers.length === 0) {
-                        window.listManager.showToast("No unissued members available", "warning");
-                        return;
-                    }
-                    
-                    const assignCount = Math.min(count, unissuedMembers.length);
-                    let assigned = 0;
-                    
-                    // Assign to the first N unissued members
-                    for (let i = 0; i < members.length && assigned < assignCount; i++) {
-                        if (!members[i].issuer) {
-                            members[i].issuer = {
-                                uid: user.id,
-                                username: user.username,
-                                color: user.color
-                            };
-                            assigned++;
+                    if (result.success) {
+                        window.listManager.showToast(`Assigned ${result.assigned} members successfully`, "success");
+                        
+                        // Close modal
+                        const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                        bootstrapModal.hide();
+                    } else {
+                        if (result.error === "No unissued members available") {
+                            window.listManager.showToast("No unissued members available", "warning");
+                        } else {
+                            window.listManager.showToast("Error assigning members: " + result.error, "error");
                         }
                     }
-                    
-                    // Update Firestore
-                    await updateDoc(listRef, { members });
-                    
-                    window.listManager.showToast(`Assigned ${assigned} members to ${user.username}`, "success");
-                    
-                    // Close modal
-                    const bootstrapModal = bootstrap.Modal.getInstance(modal);
-                    bootstrapModal.hide();
                     
                 } catch (error) {
                     console.error("Error in bulk assignment:", error);
@@ -1163,54 +1252,20 @@
             
             // Export CSV
             document.getElementById('exportCsv').addEventListener('click', function() {
-                const listData = window.listManager.getListData();
+                const result = window.listManager.exportCSV();
                 
-                if (!listData || !listData.members) {
-                    window.listManager.showToast("No data to export", "warning");
-                    return;
+                if (result.success) {
+                    window.listManager.showToast("CSV exported successfully", "success");
+                } else {
+                    window.listManager.showToast(result.error, "warning");
                 }
-                
-                // Create CSV content
-                let csvContent = "First Name,Last Name,Issuer,Description\n";
-                
-                listData.members.forEach(member => {
-                    const firstName = member.firstName || '';
-                    const lastName = member.lastName || '';
-                    const issuer = member.issuer ? member.issuer.username : '';
-                    const description = member.description || '';
-                    
-                    // Escape fields for CSV
-                    const escapeCsv = (field) => {
-                        if (field.includes(',') || field.includes('"') || field.includes('\n')) {
-                            return `"${field.replace(/"/g, '""')}"`;
-                        }
-                        return field;
-                    };
-                    
-                    csvContent += `${escapeCsv(firstName)},${escapeCsv(lastName)},${escapeCsv(issuer)},${escapeCsv(description)}\n`;
-                });
-                
-                // Create download link
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.setAttribute('href', url);
-                link.setAttribute('download', `${listData.title || 'list'}.csv`);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                window.listManager.showToast("CSV exported successfully", "success");
             });
             
             // Logout functionality
             document.getElementById('logoutBtn').addEventListener('click', async function() {
                 try {
-                    await signOut(auth);
-                    window.location.href = "index.html";
+                    await window.listManager.logout();
                 } catch (error) {
-                    console.error("Error signing out:", error);
                     window.listManager.showToast("Error signing out", "error");
                 }
             });
@@ -1223,7 +1278,6 @@
             
             document.getElementById('bulkAssignModal').addEventListener('hidden.bs.modal', function() {
                 this.removeAttribute('data-user-id');
-                this.removeAttribute('data-user-color');
             });
         });
     </script>
