@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WTM - List Management</title>
     
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👥</text></svg>">
+    
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -174,20 +177,6 @@
         .search-box {
             max-width: 300px;
         }
-        
-        .unissued-member {
-            padding: 8px 12px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-        }
-        
-        .unissued-member:hover {
-            background-color: #f8f9fa;
-        }
-        
-        .unissued-member:last-child {
-            border-bottom: none;
-        }
     </style>
 </head>
 <body>
@@ -270,7 +259,7 @@
                                 </div>
                                 <div class="col-md-6 d-flex justify-content-end">
                                     <div class="btn-group" role="group">
-                                        <button type="button" class="btn btn-outline-secondary" id="filterAll">All</button>
+                                        <button type="button" class="btn btn-outline-secondary active" id="filterAll">All</button>
                                         <button type="button" class="btn btn-outline-secondary" id="filterUnissued">Unissued</button>
                                         <button type="button" class="btn btn-outline-secondary" id="filterIssued">Issued</button>
                                     </div>
@@ -347,22 +336,6 @@
                                 </div>
                             </div>
                             <small class="text-muted" id="statsPercentage">0% issued</small>
-                        </div>
-                    </div>
-                    
-                    <!-- Unissued Members -->
-                    <div class="card mb-4">
-                        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
-                            <h5 class="card-title mb-0">Unissued Members</h5>
-                            <span class="badge bg-warning" id="unissuedCount">0</span>
-                        </div>
-                        <div class="card-body p-0">
-                            <div id="unissuedMembersList" style="max-height: 200px; overflow-y: auto;">
-                                <!-- Unissued members will be listed here -->
-                                <div class="text-center py-3 text-muted">
-                                    No unissued members
-                                </div>
-                            </div>
                         </div>
                     </div>
                     
@@ -475,9 +448,7 @@
             getDoc,
             onSnapshot,
             updateDoc,
-            runTransaction,
-            query,
-            where
+            runTransaction
         } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
         import { 
             getAuth, 
@@ -518,7 +489,9 @@
             updateDescription,
             openBulkAssignModal,
             filterAndPaginateMembers,
-            showToast
+            showToast,
+            getListData: () => listData,
+            getAllUsers: () => allUsers
         };
 
         // Auth state listener
@@ -647,9 +620,6 @@
             
             // Filter and paginate members
             filterAndPaginateMembers();
-            
-            // Update unissued members list
-            updateUnissuedMembersList();
             
             // Update recommended issuers
             updateRecommendedIssuers();
@@ -819,45 +789,6 @@
             return luminance > 0.5 ? '#000000' : '#FFFFFF';
         }
 
-        function updateUnissuedMembersList() {
-            const unissuedMembersList = document.getElementById('unissuedMembersList');
-            const unissuedCount = document.getElementById('unissuedCount');
-            
-            const unissuedMembers = listData.members?.filter(m => !m.issuer) || [];
-            unissuedCount.textContent = unissuedMembers.length;
-            
-            if (unissuedMembers.length === 0) {
-                unissuedMembersList.innerHTML = `
-                    <div class="text-center py-3 text-muted">
-                        No unissued members
-                    </div>
-                `;
-                return;
-            }
-            
-            // Only show the count, not the actual names
-            let listHTML = '';
-            unissuedMembers.slice(0, 5).forEach((member, index) => {
-                const globalIndex = listData.members.indexOf(member);
-                listHTML += `
-                    <div class="unissued-member" onclick="listManager.openAssignModal(${globalIndex})">
-                        <i class="bi bi-person me-2"></i>
-                        Member ${globalIndex + 1}
-                    </div>
-                `;
-            });
-            
-            if (unissuedMembers.length > 5) {
-                listHTML += `
-                    <div class="text-center py-2 text-muted">
-                        +${unissuedMembers.length - 5} more unissued members
-                    </div>
-                `;
-            }
-            
-            unissuedMembersList.innerHTML = listHTML;
-        }
-
         function updateRecommendedIssuers() {
             const recommendedIssuersElement = document.getElementById('recommendedIssuers');
             
@@ -988,7 +919,6 @@
 
         function openBulkAssignModal(userId, username, color) {
             document.getElementById('bulkAssignModal').setAttribute('data-user-id', userId);
-            document.getElementById('bulkAssignModal').setAttribute('data-user-color', color);
             document.getElementById('bulkIssuerName').textContent = username;
             
             const modal = new bootstrap.Modal(document.getElementById('bulkAssignModal'));
@@ -1090,6 +1020,7 @@
                 }
                 
                 const userId = selectedUserOption.getAttribute('data-user-id');
+                const allUsers = window.listManager.getAllUsers();
                 const user = allUsers.find(u => u.id === userId);
                 
                 if (!user) {
@@ -1161,7 +1092,7 @@
             document.getElementById('confirmBulkAssign').addEventListener('click', async function() {
                 const modal = document.getElementById('bulkAssignModal');
                 const userId = modal.getAttribute('data-user-id');
-                const userColor = modal.getAttribute('data-user-color');
+                const allUsers = window.listManager.getAllUsers();
                 const user = allUsers.find(u => u.id === userId);
                 const count = parseInt(document.getElementById('bulkAssignCount').value) || 5;
                 
@@ -1232,6 +1163,8 @@
             
             // Export CSV
             document.getElementById('exportCsv').addEventListener('click', function() {
+                const listData = window.listManager.getListData();
+                
                 if (!listData || !listData.members) {
                     window.listManager.showToast("No data to export", "warning");
                     return;
