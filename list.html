@@ -199,6 +199,43 @@
             font-size: 0.75rem;
             color: #6c757d;
         }
+
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .action-btn {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+        }
+
+        .member-name-editable {
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .member-name-editable:hover {
+            border-color: #dee2e6;
+            background-color: #f8f9fa;
+        }
+
+        .member-name-input {
+            width: 100%;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.875rem;
+        }
+
+        .member-name-input:focus {
+            outline: none;
+            border-color: var(--wtm-accent);
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
     </style>
 </head>
 <body>
@@ -244,6 +281,9 @@
                     </div>
                 </div>
                 <div>
+                    <button class="btn btn-success me-2" id="addMemberBtn">
+                        <i class="bi bi-person-plus me-1"></i>Add Member
+                    </button>
                     <button class="btn btn-theme" id="exportCsv">
                         <i class="bi bi-download me-1"></i>Export CSV
                     </button>
@@ -298,15 +338,16 @@
                                     <thead>
                                         <tr>
                                             <th width="5%">#</th>
-                                            <th width="35%">NAMES</th>
+                                            <th width="30%">NAMES</th>
                                             <th width="25%">ISSUER</th>
-                                            <th width="35%">DESCRIPTION</th>
+                                            <th width="30%">DESCRIPTION</th>
+                                            <th width="10%">ACTIONS</th>
                                         </tr>
                                     </thead>
                                     <tbody id="membersTableBody">
                                         <!-- Members will be populated here -->
                                         <tr>
-                                            <td colspan="4" class="text-center py-4">
+                                            <td colspan="5" class="text-center py-4">
                                                 <div class="spinner-border text-theme" role="status">
                                                     <span class="visually-hidden">Loading...</span>
                                                 </div>
@@ -446,6 +487,58 @@
         </div>
     </div>
 
+    <!-- Add Member Modal -->
+    <div class="modal fade" id="addMemberModal" tabindex="-1" aria-labelledby="addMemberModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addMemberModalLabel">Add New Member</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="memberName" class="form-label">Member Name</label>
+                        <input type="text" class="form-control" id="memberName" placeholder="Enter full name">
+                        <div class="form-text">You can enter just the full name, or separate first and last names with a space.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="confirmAddMember">
+                        <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        <span class="btn-text">Add Member</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteMemberModal" tabindex="-1" aria-labelledby="deleteMemberModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteMemberModalLabel">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete <strong id="deleteMemberName">this member</strong>?</p>
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        This action cannot be undone.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteMember">
+                        <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        <span class="btn-text">Delete Member</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
@@ -530,7 +623,12 @@
             exportCSV,
             logout,
             populateUsersList,
-            getIssuerCounts
+            getIssuerCounts,
+            addMember,
+            updateMemberName,
+            deleteMember,
+            openAddMemberModal,
+            openDeleteMemberModal
         };
 
         // Auth state listener
@@ -750,7 +848,7 @@
             if (filteredMembers.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="4" class="text-center py-4 text-muted">
+                        <td colspan="5" class="text-center py-4 text-muted">
                             No members found matching your criteria
                         </td>
                     </tr>
@@ -772,18 +870,32 @@
                 tableHTML += `
                     <tr>
                         <td>${displayNumber}</td>
-                        <td>${member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim()}</td>
+                        <td>
+                            ${renderNameCell(member, globalIndex)}
+                        </td>
                         <td>
                             ${renderIssuerCell(member, globalIndex)}
                         </td>
                         <td>
                             ${renderDescriptionCell(member, globalIndex)}
                         </td>
+                        <td>
+                            ${renderActionsCell(member, globalIndex)}
+                        </td>
                     </tr>
                 `;
             });
             
             tableBody.innerHTML = tableHTML;
+        }
+
+        function renderNameCell(member, index) {
+            const fullName = member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim();
+            return `
+                <div class="member-name-editable" onclick="startEditName(${index})">
+                    ${fullName}
+                </div>
+            `;
         }
 
         function renderIssuerCell(member, index) {
@@ -812,6 +924,16 @@
                        value="${member.description || ''}" 
                        placeholder="Add description..."
                        onchange="listManager.updateDescription(${index}, this.value)">
+            `;
+        }
+
+        function renderActionsCell(member, index) {
+            return `
+                <div class="action-buttons">
+                    <button class="btn btn-outline-danger btn-sm action-btn" onclick="listManager.openDeleteMemberModal(${index})" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
             `;
         }
 
@@ -886,6 +1008,113 @@
             recommendedIssuersElement.innerHTML = recommendationsHTML;
         }
 
+        // Member Management Functions
+        async function addMember(name) {
+            try {
+                if (!name || !name.trim()) {
+                    throw new Error("Member name cannot be empty");
+                }
+
+                const listRef = doc(db, "lists", listId);
+                const members = [...(listData.members || [])];
+                
+                // Parse the name - if it contains space, split into first and last name
+                const nameParts = name.trim().split(' ');
+                let firstName = '';
+                let lastName = '';
+                
+                if (nameParts.length === 1) {
+                    // Single name - use as first name
+                    firstName = nameParts[0];
+                } else {
+                    // Multiple names - use first as first name, rest as last name
+                    firstName = nameParts[0];
+                    lastName = nameParts.slice(1).join(' ');
+                }
+                
+                // Create new member object
+                const newMember = {
+                    firstName: firstName,
+                    lastName: lastName,
+                    description: '',
+                    issuer: null
+                };
+                
+                // Add to members array
+                members.push(newMember);
+                
+                // Update Firestore
+                await updateDoc(listRef, {
+                    members: members
+                });
+                
+                return { success: true };
+            } catch (error) {
+                console.error("Error adding member:", error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function updateMemberName(memberIndex, newName) {
+            try {
+                if (!newName || !newName.trim()) {
+                    throw new Error("Member name cannot be empty");
+                }
+
+                const listRef = doc(db, "lists", listId);
+                const members = [...listData.members];
+                
+                // Parse the name - if it contains space, split into first and last name
+                const nameParts = newName.trim().split(' ');
+                let firstName = '';
+                let lastName = '';
+                
+                if (nameParts.length === 1) {
+                    // Single name - use as first name
+                    firstName = nameParts[0];
+                    lastName = '';
+                } else {
+                    // Multiple names - use first as first name, rest as last name
+                    firstName = nameParts[0];
+                    lastName = nameParts.slice(1).join(' ');
+                }
+                
+                // Update the member
+                members[memberIndex].firstName = firstName;
+                members[memberIndex].lastName = lastName;
+                
+                // Update Firestore
+                await updateDoc(listRef, {
+                    members: members
+                });
+                
+                return { success: true };
+            } catch (error) {
+                console.error("Error updating member name:", error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function deleteMember(memberIndex) {
+            try {
+                const listRef = doc(db, "lists", listId);
+                const members = [...listData.members];
+                
+                // Remove the member
+                members.splice(memberIndex, 1);
+                
+                // Update Firestore
+                await updateDoc(listRef, {
+                    members: members
+                });
+                
+                return { success: true };
+            } catch (error) {
+                console.error("Error deleting member:", error);
+                return { success: false, error: error.message };
+            }
+        }
+
         // Modal functions
         function openAssignModal(memberIndex) {
             const member = listData.members[memberIndex];
@@ -913,6 +1142,28 @@
             
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('assignModal'));
+            modal.show();
+        }
+
+        function openAddMemberModal() {
+            // Reset form
+            document.getElementById('memberName').value = '';
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('addMemberModal'));
+            modal.show();
+        }
+
+        function openDeleteMemberModal(memberIndex) {
+            const member = listData.members[memberIndex];
+            const memberName = member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim();
+            
+            // Store the member index for later use
+            document.getElementById('deleteMemberModal').setAttribute('data-member-index', memberIndex);
+            document.getElementById('deleteMemberName').textContent = memberName;
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('deleteMemberModal'));
             modal.show();
         }
 
@@ -1190,6 +1441,44 @@
     </script>
 
     <script>
+        // Global function for inline editing
+        function startEditName(memberIndex) {
+            const tableBody = document.getElementById('membersTableBody');
+            const row = tableBody.querySelector(`tr:nth-child(${memberIndex + 1})`);
+            const nameCell = row.querySelector('td:nth-child(2)');
+            const currentName = nameCell.querySelector('.member-name-editable').textContent.trim();
+            
+            nameCell.innerHTML = `
+                <input type="text" 
+                       class="member-name-input" 
+                       value="${currentName}" 
+                       onblur="finishEditName(${memberIndex}, this.value)"
+                       onkeypress="if(event.key === 'Enter') this.blur()"
+                       autofocus>
+            `;
+            
+            // Focus and select all text
+            const input = nameCell.querySelector('.member-name-input');
+            input.focus();
+            input.select();
+        }
+
+        async function finishEditName(memberIndex, newName) {
+            if (newName.trim()) {
+                const result = await window.listManager.updateMemberName(memberIndex, newName);
+                if (result.success) {
+                    window.listManager.showToast("Member name updated", "success");
+                } else {
+                    window.listManager.showToast("Error updating name: " + result.error, "error");
+                    // Re-render the table to show original name
+                    window.listManager.filterAndPaginateMembers();
+                }
+            } else {
+                // If empty, re-render to show original name
+                window.listManager.filterAndPaginateMembers();
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             // Search functionality for main table
             const searchInput = document.getElementById('searchInput');
@@ -1252,6 +1541,90 @@
                 currentPage = 1;
                 updateActiveFilterButton(this);
                 window.listManager.filterAndPaginateMembers();
+            });
+            
+            // Add Member button
+            document.getElementById('addMemberBtn').addEventListener('click', function() {
+                window.listManager.openAddMemberModal();
+            });
+            
+            // Add Member confirmation
+            document.getElementById('confirmAddMember').addEventListener('click', async function() {
+                const memberName = document.getElementById('memberName').value.trim();
+                
+                if (!memberName) {
+                    window.listManager.showToast("Please enter a member name", "error");
+                    return;
+                }
+                
+                // Show loading state
+                const spinner = this.querySelector('.spinner-border');
+                const btnText = this.querySelector('.btn-text');
+                
+                spinner.classList.remove('d-none');
+                btnText.textContent = 'Adding...';
+                this.disabled = true;
+                
+                try {
+                    const result = await window.listManager.addMember(memberName);
+                    
+                    if (result.success) {
+                        window.listManager.showToast("Member added successfully", "success");
+                        
+                        // Close modal
+                        const modal = document.getElementById('addMemberModal');
+                        const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                        bootstrapModal.hide();
+                    } else {
+                        window.listManager.showToast("Error adding member: " + result.error, "error");
+                    }
+                    
+                } catch (error) {
+                    console.error("Error adding member:", error);
+                    window.listManager.showToast("Error adding member", "error");
+                } finally {
+                    // Reset button state
+                    spinner.classList.add('d-none');
+                    btnText.textContent = 'Add Member';
+                    this.disabled = false;
+                }
+            });
+            
+            // Delete Member confirmation
+            document.getElementById('confirmDeleteMember').addEventListener('click', async function() {
+                const modal = document.getElementById('deleteMemberModal');
+                const memberIndex = parseInt(modal.getAttribute('data-member-index'));
+                
+                // Show loading state
+                const spinner = this.querySelector('.spinner-border');
+                const btnText = this.querySelector('.btn-text');
+                
+                spinner.classList.remove('d-none');
+                btnText.textContent = 'Deleting...';
+                this.disabled = true;
+                
+                try {
+                    const result = await window.listManager.deleteMember(memberIndex);
+                    
+                    if (result.success) {
+                        window.listManager.showToast("Member deleted successfully", "success");
+                        
+                        // Close modal
+                        const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                        bootstrapModal.hide();
+                    } else {
+                        window.listManager.showToast("Error deleting member: " + result.error, "error");
+                    }
+                    
+                } catch (error) {
+                    console.error("Error deleting member:", error);
+                    window.listManager.showToast("Error deleting member", "error");
+                } finally {
+                    // Reset button state
+                    spinner.classList.add('d-none');
+                    btnText.textContent = 'Delete Member';
+                    this.disabled = false;
+                }
             });
             
             function updateActiveFilterButton(activeButton) {
@@ -1385,6 +1758,14 @@
                     userSearchInput.value = '';
                 }
                 currentUserSearch = '';
+            });
+            
+            document.getElementById('addMemberModal').addEventListener('hidden.bs.modal', function() {
+                document.getElementById('memberName').value = '';
+            });
+            
+            document.getElementById('deleteMemberModal').addEventListener('hidden.bs.modal', function() {
+                this.removeAttribute('data-member-index');
             });
             
             document.getElementById('bulkAssignModal').addEventListener('hidden.bs.modal', function() {
