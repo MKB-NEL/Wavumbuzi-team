@@ -177,6 +177,28 @@
         .search-box {
             max-width: 300px;
         }
+
+        .modal-search-box {
+            width: 100%;
+        }
+
+        .user-option-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .user-stats {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .assignment-count {
+            font-size: 0.75rem;
+            color: #6c757d;
+        }
     </style>
 </head>
 <body>
@@ -368,6 +390,15 @@
                 </div>
                 <div class="modal-body">
                     <p class="mb-3">Select a user to assign as issuer for <strong id="assignMemberName">this member</strong>:</p>
+                    
+                    <!-- Search Box for Users -->
+                    <div class="input-group mb-3 modal-search-box">
+                        <input type="text" class="form-control" id="userSearchInput" placeholder="Search issuers...">
+                        <button class="btn btn-outline-secondary" type="button" id="clearUserSearch">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                    
                     <div id="usersList" style="max-height: 300px; overflow-y: auto;">
                         <!-- Users will be populated here -->
                         <div class="text-center py-3">
@@ -482,6 +513,8 @@
         let filteredMembers = [];
         let currentFilter = 'all';
         let currentSearch = '';
+        let userSearchTimeout = null;
+        let currentUserSearch = '';
 
         // Make functions available globally
         window.listManager = {
@@ -495,7 +528,9 @@
             assignIssuer,
             bulkAssignIssuer,
             exportCSV,
-            logout
+            logout,
+            populateUsersList,
+            getIssuerCounts
         };
 
         // Auth state listener
@@ -793,10 +828,7 @@
             return luminance > 0.5 ? '#000000' : '#FFFFFF';
         }
 
-        function updateRecommendedIssuers() {
-            const recommendedIssuersElement = document.getElementById('recommendedIssuers');
-            
-            // Simple recommendation algorithm: users with fewest assignments
+        function getIssuerCounts() {
             const issuerCounts = {};
             
             // Count assignments per user
@@ -806,11 +838,18 @@
                 }
             });
             
-            // Sort users by assignment count (ascending)
+            return issuerCounts;
+        }
+
+        function updateRecommendedIssuers() {
+            const recommendedIssuersElement = document.getElementById('recommendedIssuers');
+            const issuerCounts = getIssuerCounts();
+            
+            // Sort users by assignment count (descending) - most active issuers first
             const sortedUsers = [...allUsers].sort((a, b) => {
                 const countA = issuerCounts[a.id] || 0;
                 const countB = issuerCounts[b.id] || 0;
-                return countA - countB;
+                return countB - countA; // Descending order
             });
             
             // Take top 3 recommendations
@@ -862,15 +901,65 @@
             document.getElementById('assignMemberName').textContent = 
                 member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim();
             
+            // Reset search
+            currentUserSearch = '';
+            const userSearchInput = document.getElementById('userSearchInput');
+            if (userSearchInput) {
+                userSearchInput.value = '';
+            }
+            
             // Populate users list
+            populateUsersList();
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('assignModal'));
+            modal.show();
+        }
+
+        function populateUsersList(searchTerm = '') {
             const usersListElement = document.getElementById('usersList');
+            const issuerCounts = getIssuerCounts();
+            
+            // Filter users based on search term
+            let filteredUsers = allUsers;
+            if (searchTerm) {
+                const searchLower = searchTerm.toLowerCase();
+                filteredUsers = allUsers.filter(user => 
+                    user.username.toLowerCase().includes(searchLower)
+                );
+            }
+            
+            // Sort users by assignment count (descending) - most active issuers first
+            filteredUsers.sort((a, b) => {
+                const countA = issuerCounts[a.id] || 0;
+                const countB = issuerCounts[b.id] || 0;
+                return countB - countA; // Descending order
+            });
+            
+            if (filteredUsers.length === 0) {
+                usersListElement.innerHTML = `
+                    <div class="text-center py-3 text-muted">
+                        No users found matching your search
+                    </div>
+                `;
+                return;
+            }
+            
             let usersHTML = '';
             
-            allUsers.forEach(user => {
+            filteredUsers.forEach(user => {
+                const assignmentCount = issuerCounts[user.id] || 0;
                 usersHTML += `
                     <div class="user-option" data-user-id="${user.id}">
-                        <span class="user-color-badge me-2" style="background-color: ${user.color || '#6c757d'};"></span>
-                        <span>${user.username}</span>
+                        <div class="user-option-content">
+                            <div class="d-flex align-items-center">
+                                <span class="user-color-badge me-2" style="background-color: ${user.color || '#6c757d'};"></span>
+                                <span>${user.username}</span>
+                            </div>
+                            <div class="user-stats">
+                                <span class="assignment-count">${assignmentCount} assigned</span>
+                            </div>
+                        </div>
                     </div>
                 `;
             });
@@ -895,10 +984,6 @@
             
             // Reset confirm button
             document.getElementById('confirmAssign').disabled = true;
-            
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('assignModal'));
-            modal.show();
         }
 
         async function updateDescription(memberIndex, newDescription) {
@@ -1106,7 +1191,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Search functionality
+            // Search functionality for main table
             const searchInput = document.getElementById('searchInput');
             const clearSearch = document.getElementById('clearSearch');
             
@@ -1126,6 +1211,26 @@
                 currentPage = 1;
                 window.listManager.filterAndPaginateMembers();
             });
+            
+            // Search functionality for user modal
+            const userSearchInput = document.getElementById('userSearchInput');
+            const clearUserSearch = document.getElementById('clearUserSearch');
+            
+            if (userSearchInput && clearUserSearch) {
+                userSearchInput.addEventListener('input', function() {
+                    clearTimeout(userSearchTimeout);
+                    userSearchTimeout = setTimeout(() => {
+                        currentUserSearch = this.value;
+                        window.listManager.populateUsersList(currentUserSearch);
+                    }, 300);
+                });
+                
+                clearUserSearch.addEventListener('click', function() {
+                    userSearchInput.value = '';
+                    currentUserSearch = '';
+                    window.listManager.populateUsersList('');
+                });
+            }
             
             // Filter buttons
             document.getElementById('filterAll').addEventListener('click', function() {
@@ -1274,6 +1379,12 @@
             document.getElementById('assignModal').addEventListener('hidden.bs.modal', function() {
                 this.removeAttribute('data-member-index');
                 document.getElementById('confirmAssign').disabled = true;
+                // Clear search when modal closes
+                const userSearchInput = document.getElementById('userSearchInput');
+                if (userSearchInput) {
+                    userSearchInput.value = '';
+                }
+                currentUserSearch = '';
             });
             
             document.getElementById('bulkAssignModal').addEventListener('hidden.bs.modal', function() {
