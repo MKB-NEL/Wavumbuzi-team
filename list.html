@@ -236,11 +236,47 @@
             border-color: var(--wtm-accent);
             box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
         }
+
+        .email-cell {
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .email-cell:hover {
+            background-color: #f8f9fa;
+            color: var(--wtm-accent);
+        }
+
+        .email-copy-notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--wtm-accent);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1070;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .email-copy-notification.show {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
+    
+    <!-- Email Copy Notification -->
+    <div class="email-copy-notification" id="emailCopyNotification">
+        <i class="bi bi-check-circle me-2"></i>Email copied to clipboard
+    </div>
     
     <!-- Header Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light">
@@ -313,7 +349,7 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="input-group search-box">
-                                        <input type="text" class="form-control" id="searchInput" placeholder="Search by name...">
+                                        <input type="text" class="form-control" id="searchInput" placeholder="Search by name or email...">
                                         <button class="btn btn-outline-secondary" type="button" id="clearSearch">
                                             <i class="bi bi-x"></i>
                                         </button>
@@ -338,16 +374,17 @@
                                     <thead>
                                         <tr>
                                             <th width="5%">#</th>
-                                            <th width="30%">NAMES</th>
-                                            <th width="25%">ISSUER</th>
-                                            <th width="30%">DESCRIPTION</th>
+                                            <th width="25%">NAMES</th>
+                                            <th width="20%">EMAIL</th>
+                                            <th width="20%">ISSUER</th>
+                                            <th width="20%">DESCRIPTION</th>
                                             <th width="10%">ACTIONS</th>
                                         </tr>
                                     </thead>
                                     <tbody id="membersTableBody">
                                         <!-- Members will be populated here -->
                                         <tr>
-                                            <td colspan="5" class="text-center py-4">
+                                            <td colspan="6" class="text-center py-4">
                                                 <div class="spinner-border text-theme" role="status">
                                                     <span class="visually-hidden">Loading...</span>
                                                 </div>
@@ -501,6 +538,10 @@
                         <input type="text" class="form-control" id="memberName" placeholder="Enter full name">
                         <div class="form-text">You can enter just the full name, or separate first and last names with a space.</div>
                     </div>
+                    <div class="mb-3">
+                        <label for="memberEmail" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="memberEmail" placeholder="Enter email address">
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -628,7 +669,8 @@
             updateMemberName,
             deleteMember,
             openAddMemberModal,
-            openDeleteMemberModal
+            openDeleteMemberModal,
+            copyEmailToClipboard
         };
 
         // Auth state listener
@@ -771,7 +813,9 @@
                 if (currentSearch) {
                     const searchTerm = currentSearch.toLowerCase();
                     const fullName = `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase();
-                    if (!fullName.includes(searchTerm)) {
+                    const email = member.email || '';
+                    
+                    if (!fullName.includes(searchTerm) && !email.toLowerCase().includes(searchTerm)) {
                         return false;
                     }
                 }
@@ -848,7 +892,7 @@
             if (filteredMembers.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="text-center py-4 text-muted">
+                        <td colspan="6" class="text-center py-4 text-muted">
                             No members found matching your criteria
                         </td>
                     </tr>
@@ -874,6 +918,9 @@
                             ${renderNameCell(member, globalIndex)}
                         </td>
                         <td>
+                            ${renderEmailCell(member)}
+                        </td>
+                        <td>
                             ${renderIssuerCell(member, globalIndex)}
                         </td>
                         <td>
@@ -896,6 +943,19 @@
                     ${fullName}
                 </div>
             `;
+        }
+
+        function renderEmailCell(member) {
+            const email = member.email || '';
+            if (email) {
+                return `
+                    <div class="email-cell" onclick="listManager.copyEmailToClipboard('${email}')" title="Click to copy email">
+                        ${email}
+                    </div>
+                `;
+            } else {
+                return `<div class="text-muted">No email</div>`;
+            }
         }
 
         function renderIssuerCell(member, index) {
@@ -1008,8 +1068,27 @@
             recommendedIssuersElement.innerHTML = recommendationsHTML;
         }
 
+        // Email copy functionality
+        function copyEmailToClipboard(email) {
+            navigator.clipboard.writeText(email).then(() => {
+                showEmailCopyNotification();
+            }).catch(err => {
+                console.error('Failed to copy email: ', err);
+                showToast("Failed to copy email", "error");
+            });
+        }
+
+        function showEmailCopyNotification() {
+            const notification = document.getElementById('emailCopyNotification');
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
         // Member Management Functions
-        async function addMember(name) {
+        async function addMember(name, email) {
             try {
                 if (!name || !name.trim()) {
                     throw new Error("Member name cannot be empty");
@@ -1036,6 +1115,7 @@
                 const newMember = {
                     firstName: firstName,
                     lastName: lastName,
+                    email: email || '',
                     description: '',
                     issuer: null
                 };
@@ -1148,6 +1228,7 @@
         function openAddMemberModal() {
             // Reset form
             document.getElementById('memberName').value = '';
+            document.getElementById('memberEmail').value = '';
             
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('addMemberModal'));
@@ -1364,11 +1445,12 @@
             
             try {
                 // Create CSV content
-                let csvContent = "First Name,Last Name,Issuer,Description\n";
+                let csvContent = "First Name,Last Name,Email,Issuer,Description\n";
                 
                 listData.members.forEach(member => {
                     const firstName = member.firstName || '';
                     const lastName = member.lastName || '';
+                    const email = member.email || '';
                     const issuer = member.issuer ? member.issuer.username : '';
                     const description = member.description || '';
                     
@@ -1380,7 +1462,7 @@
                         return field;
                     };
                     
-                    csvContent += `${escapeCsv(firstName)},${escapeCsv(lastName)},${escapeCsv(issuer)},${escapeCsv(description)}\n`;
+                    csvContent += `${escapeCsv(firstName)},${escapeCsv(lastName)},${escapeCsv(email)},${escapeCsv(issuer)},${escapeCsv(description)}\n`;
                 });
                 
                 // Create download link
@@ -1551,6 +1633,7 @@
             // Add Member confirmation
             document.getElementById('confirmAddMember').addEventListener('click', async function() {
                 const memberName = document.getElementById('memberName').value.trim();
+                const memberEmail = document.getElementById('memberEmail').value.trim();
                 
                 if (!memberName) {
                     window.listManager.showToast("Please enter a member name", "error");
@@ -1566,7 +1649,7 @@
                 this.disabled = true;
                 
                 try {
-                    const result = await window.listManager.addMember(memberName);
+                    const result = await window.listManager.addMember(memberName, memberEmail);
                     
                     if (result.success) {
                         window.listManager.showToast("Member added successfully", "success");
@@ -1762,6 +1845,7 @@
             
             document.getElementById('addMemberModal').addEventListener('hidden.bs.modal', function() {
                 document.getElementById('memberName').value = '';
+                document.getElementById('memberEmail').value = '';
             });
             
             document.getElementById('deleteMemberModal').addEventListener('hidden.bs.modal', function() {
