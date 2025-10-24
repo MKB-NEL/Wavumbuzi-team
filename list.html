@@ -267,6 +267,35 @@
         .email-copy-notification.show {
             opacity: 1;
         }
+
+        .file-upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .file-upload-area:hover {
+            border-color: var(--wtm-accent);
+            background-color: #f8f9fa;
+        }
+
+        .file-upload-area.dragover {
+            border-color: var(--wtm-accent);
+            background-color: #e7f1ff;
+        }
+
+        .file-preview {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+
+        .preview-table {
+            font-size: 0.875rem;
+        }
     </style>
 </head>
 <body>
@@ -526,21 +555,97 @@
 
     <!-- Add Member Modal -->
     <div class="modal fade" id="addMemberModal" tabindex="-1" aria-labelledby="addMemberModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addMemberModalLabel">Add New Member</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="memberName" class="form-label">Member Name</label>
-                        <input type="text" class="form-control" id="memberName" placeholder="Enter full name">
-                        <div class="form-text">You can enter just the full name, or separate first and last names with a space.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="memberEmail" class="form-label">Email Address</label>
-                        <input type="email" class="form-control" id="memberEmail" placeholder="Enter email address">
+                    <ul class="nav nav-tabs mb-3" id="addMemberTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="single-tab" data-bs-toggle="tab" data-bs-target="#single" type="button" role="tab">Single Member</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="excel-tab" data-bs-toggle="tab" data-bs-target="#excel" type="button" role="tab">Excel Upload</button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="addMemberTabContent">
+                        <!-- Single Member Tab -->
+                        <div class="tab-pane fade show active" id="single" role="tabpanel">
+                            <div class="mb-3">
+                                <label for="memberName" class="form-label">Member Name</label>
+                                <input type="text" class="form-control" id="memberName" placeholder="Enter full name">
+                                <div class="form-text">You can enter just the full name, or separate first and last names with a space.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="memberEmail" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="memberEmail" placeholder="Enter email address">
+                            </div>
+                        </div>
+                        
+                        <!-- Excel Upload Tab -->
+                        <div class="tab-pane fade" id="excel" role="tabpanel">
+                            <div class="file-upload-area" id="fileUploadArea">
+                                <i class="bi bi-file-earmark-excel fs-1 text-success"></i>
+                                <h5 class="mt-3">Upload Excel File</h5>
+                                <p class="text-muted">Drag & drop your Excel file here or click to browse</p>
+                                <p class="small text-muted">Supported formats: .xlsx, .xls, .csv</p>
+                                <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display: none;">
+                                <button type="button" class="btn btn-outline-success mt-2" onclick="document.getElementById('excelFileInput').click()">
+                                    <i class="bi bi-upload me-1"></i>Choose File
+                                </button>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <h6>Expected Format:</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered preview-table">
+                                        <thead>
+                                            <tr class="table-light">
+                                                <th>LAST NAME</th>
+                                                <th>FIRST NAME</th>
+                                                <th>EMAIL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>Doe</td>
+                                                <td>John</td>
+                                                <td>john.doe@example.com</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Smith</td>
+                                                <td>Jane</td>
+                                                <td>jane.smith@example.com</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <div id="filePreview" class="file-preview" style="display: none;">
+                                <h6>Preview:</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered preview-table" id="previewTable">
+                                        <thead>
+                                            <tr class="table-light">
+                                                <th>LAST NAME</th>
+                                                <th>FIRST NAME</th>
+                                                <th>EMAIL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="previewTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="alert alert-info mt-2">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    <span id="previewCount">0</span> members will be added
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -601,6 +706,8 @@
 
     <!-- Required Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- SheetJS for Excel parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <!-- Firebase Integration -->
     <script type="module">
@@ -649,6 +756,8 @@
         let currentSearch = '';
         let userSearchTimeout = null;
         let currentUserSearch = '';
+        let isListOwner = false;
+        let excelMembers = [];
 
         // Make functions available globally
         window.listManager = {
@@ -666,11 +775,13 @@
             populateUsersList,
             getIssuerCounts,
             addMember,
+            addMembersFromExcel,
             updateMemberName,
             deleteMember,
             openAddMemberModal,
             openDeleteMemberModal,
-            copyEmailToClipboard
+            copyEmailToClipboard,
+            isListOwner: () => isListOwner
         };
 
         // Auth state listener
@@ -759,6 +870,8 @@
             listUnsubscribe = onSnapshot(listRef, (doc) => {
                 if (doc.exists()) {
                     listData = doc.data();
+                    // Check if current user is the list owner
+                    isListOwner = listData.ownerId === currentUser.uid;
                     updateListUI();
                 } else {
                     showToast("List not found", "error");
@@ -988,13 +1101,18 @@
         }
 
         function renderActionsCell(member, index) {
-            return `
-                <div class="action-buttons">
-                    <button class="btn btn-outline-danger btn-sm action-btn" onclick="listManager.openDeleteMemberModal(${index})" title="Delete">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
-            `;
+            // Only show delete button if user is list owner
+            if (isListOwner) {
+                return `
+                    <div class="action-buttons">
+                        <button class="btn btn-outline-danger btn-sm action-btn" onclick="listManager.openDeleteMemberModal(${index})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `;
+            } else {
+                return `<div class="text-muted">Read only</div>`;
+            }
         }
 
         function getContrastColor(hexColor) {
@@ -1135,6 +1253,39 @@
             }
         }
 
+        async function addMembersFromExcel(membersData) {
+            try {
+                if (!membersData || membersData.length === 0) {
+                    throw new Error("No valid member data to add");
+                }
+
+                const listRef = doc(db, "lists", listId);
+                const members = [...(listData.members || [])];
+                
+                // Add each member from Excel data
+                membersData.forEach(memberData => {
+                    const newMember = {
+                        firstName: memberData.firstName || '',
+                        lastName: memberData.lastName || '',
+                        email: memberData.email || '',
+                        description: '',
+                        issuer: null
+                    };
+                    members.push(newMember);
+                });
+                
+                // Update Firestore
+                await updateDoc(listRef, {
+                    members: members
+                });
+                
+                return { success: true, count: membersData.length };
+            } catch (error) {
+                console.error("Error adding members from Excel:", error);
+                return { success: false, error: error.message };
+            }
+        }
+
         async function updateMemberName(memberIndex, newName) {
             try {
                 if (!newName || !newName.trim()) {
@@ -1177,6 +1328,11 @@
 
         async function deleteMember(memberIndex) {
             try {
+                // Check if user is list owner
+                if (!isListOwner) {
+                    throw new Error("Only list owners can delete members");
+                }
+
                 const listRef = doc(db, "lists", listId);
                 const members = [...listData.members];
                 
@@ -1226,9 +1382,11 @@
         }
 
         function openAddMemberModal() {
-            // Reset form
+            // Reset form and tabs
             document.getElementById('memberName').value = '';
             document.getElementById('memberEmail').value = '';
+            document.getElementById('single-tab').click();
+            resetExcelUpload();
             
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('addMemberModal'));
@@ -1236,6 +1394,12 @@
         }
 
         function openDeleteMemberModal(memberIndex) {
+            // Check if user is list owner
+            if (!isListOwner) {
+                showToast("Only list owners can delete members", "error");
+                return;
+            }
+
             const member = listData.members[memberIndex];
             const memberName = member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim();
             
@@ -1561,6 +1725,113 @@
             }
         }
 
+        // Excel file handling
+        function handleExcelFile(file) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Get first worksheet
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    if (jsonData.length === 0) {
+                        window.listManager.showToast("Excel file is empty", "error");
+                        return;
+                    }
+                    
+                    // Process the data
+                    const members = [];
+                    let hasValidData = false;
+                    
+                    jsonData.forEach((row, index) => {
+                        // Check for required columns (case insensitive)
+                        const lastName = row['LAST NAME'] || row['last name'] || row['Last Name'] || '';
+                        const firstName = row['FIRST NAME'] || row['first name'] || row['First Name'] || '';
+                        const email = row['EMAIL'] || row['email'] || row['Email'] || '';
+                        
+                        // Skip empty rows
+                        if (!lastName && !firstName && !email) {
+                            return;
+                        }
+                        
+                        hasValidData = true;
+                        members.push({
+                            lastName: lastName.toString().trim(),
+                            firstName: firstName.toString().trim(),
+                            email: email.toString().trim()
+                        });
+                    });
+                    
+                    if (!hasValidData) {
+                        window.listManager.showToast("No valid data found in Excel file", "error");
+                        return;
+                    }
+                    
+                    // Store members for later use
+                    window.listManager.excelMembers = members;
+                    
+                    // Show preview
+                    showExcelPreview(members);
+                    
+                } catch (error) {
+                    console.error("Error processing Excel file:", error);
+                    window.listManager.showToast("Error processing Excel file", "error");
+                }
+            };
+            
+            reader.onerror = function() {
+                window.listManager.showToast("Error reading file", "error");
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        function showExcelPreview(members) {
+            const previewContainer = document.getElementById('filePreview');
+            const previewTableBody = document.getElementById('previewTableBody');
+            const previewCount = document.getElementById('previewCount');
+            
+            // Clear previous preview
+            previewTableBody.innerHTML = '';
+            
+            // Show first 10 rows for preview
+            const previewRows = members.slice(0, 10);
+            
+            previewRows.forEach(member => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${member.lastName}</td>
+                    <td>${member.firstName}</td>
+                    <td>${member.email}</td>
+                `;
+                previewTableBody.appendChild(row);
+            });
+            
+            // Show "more rows" indicator if there are more than 10
+            if (members.length > 10) {
+                const moreRow = document.createElement('tr');
+                moreRow.innerHTML = `
+                    <td colspan="3" class="text-center text-muted">
+                        ... and ${members.length - 10} more rows
+                    </td>
+                `;
+                previewTableBody.appendChild(moreRow);
+            }
+            
+            previewCount.textContent = members.length;
+            previewContainer.style.display = 'block';
+        }
+
+        function resetExcelUpload() {
+            document.getElementById('excelFileInput').value = '';
+            document.getElementById('filePreview').style.display = 'none';
+            window.listManager.excelMembers = [];
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             // Search functionality for main table
             const searchInput = document.getElementById('searchInput');
@@ -1632,44 +1903,89 @@
             
             // Add Member confirmation
             document.getElementById('confirmAddMember').addEventListener('click', async function() {
-                const memberName = document.getElementById('memberName').value.trim();
-                const memberEmail = document.getElementById('memberEmail').value.trim();
+                const activeTab = document.querySelector('#addMemberTabs .nav-link.active').id;
                 
-                if (!memberName) {
-                    window.listManager.showToast("Please enter a member name", "error");
-                    return;
-                }
-                
-                // Show loading state
-                const spinner = this.querySelector('.spinner-border');
-                const btnText = this.querySelector('.btn-text');
-                
-                spinner.classList.remove('d-none');
-                btnText.textContent = 'Adding...';
-                this.disabled = true;
-                
-                try {
-                    const result = await window.listManager.addMember(memberName, memberEmail);
+                if (activeTab === 'single-tab') {
+                    // Single member addition
+                    const memberName = document.getElementById('memberName').value.trim();
+                    const memberEmail = document.getElementById('memberEmail').value.trim();
                     
-                    if (result.success) {
-                        window.listManager.showToast("Member added successfully", "success");
-                        
-                        // Close modal
-                        const modal = document.getElementById('addMemberModal');
-                        const bootstrapModal = bootstrap.Modal.getInstance(modal);
-                        bootstrapModal.hide();
-                    } else {
-                        window.listManager.showToast("Error adding member: " + result.error, "error");
+                    if (!memberName) {
+                        window.listManager.showToast("Please enter a member name", "error");
+                        return;
                     }
                     
-                } catch (error) {
-                    console.error("Error adding member:", error);
-                    window.listManager.showToast("Error adding member", "error");
-                } finally {
-                    // Reset button state
-                    spinner.classList.add('d-none');
-                    btnText.textContent = 'Add Member';
-                    this.disabled = false;
+                    // Show loading state
+                    const spinner = this.querySelector('.spinner-border');
+                    const btnText = this.querySelector('.btn-text');
+                    
+                    spinner.classList.remove('d-none');
+                    btnText.textContent = 'Adding...';
+                    this.disabled = true;
+                    
+                    try {
+                        const result = await window.listManager.addMember(memberName, memberEmail);
+                        
+                        if (result.success) {
+                            window.listManager.showToast("Member added successfully", "success");
+                            
+                            // Close modal
+                            const modal = document.getElementById('addMemberModal');
+                            const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                            bootstrapModal.hide();
+                        } else {
+                            window.listManager.showToast("Error adding member: " + result.error, "error");
+                        }
+                        
+                    } catch (error) {
+                        console.error("Error adding member:", error);
+                        window.listManager.showToast("Error adding member", "error");
+                    } finally {
+                        // Reset button state
+                        spinner.classList.add('d-none');
+                        btnText.textContent = 'Add Member';
+                        this.disabled = false;
+                    }
+                } else {
+                    // Excel upload
+                    const members = window.listManager.excelMembers;
+                    
+                    if (!members || members.length === 0) {
+                        window.listManager.showToast("Please upload an Excel file first", "error");
+                        return;
+                    }
+                    
+                    // Show loading state
+                    const spinner = this.querySelector('.spinner-border');
+                    const btnText = this.querySelector('.btn-text');
+                    
+                    spinner.classList.remove('d-none');
+                    btnText.textContent = `Adding ${members.length} members...`;
+                    this.disabled = true;
+                    
+                    try {
+                        const result = await window.listManager.addMembersFromExcel(members);
+                        
+                        if (result.success) {
+                            window.listManager.showToast(`${result.count} members added successfully`, "success");
+                            
+                            // Close modal
+                            const modal = document.getElementById('addMemberModal');
+                            const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                            bootstrapModal.hide();
+                        } else {
+                            window.listManager.showToast("Error adding members: " + result.error, "error");
+                        }
+                        
+                    } catch (error) {
+                        console.error("Error adding members:", error);
+                        window.listManager.showToast("Error adding members", "error");
+                    } finally {
+                        // Reset button state
+                        spinner.classList.add('d-none');
+                        btnText.textContent = 'Add Member';
+                        this.disabled = false;
+                    }
                 }
             });
             
@@ -1697,7 +2013,7 @@
                         bootstrapModal.hide();
                     } else {
                         window.listManager.showToast("Error deleting member: " + result.error, "error");
-                    }
+                        }
                     
                 } catch (error) {
                     console.error("Error deleting member:", error);
@@ -1831,6 +2147,46 @@
                 }
             });
             
+            // Excel file upload handling
+            const fileUploadArea = document.getElementById('fileUploadArea');
+            const excelFileInput = document.getElementById('excelFileInput');
+            
+            if (fileUploadArea && excelFileInput) {
+                // Click to upload
+                fileUploadArea.addEventListener('click', function() {
+                    excelFileInput.click();
+                });
+                
+                // File input change
+                excelFileInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        handleExcelFile(file);
+                    }
+                });
+                
+                // Drag and drop
+                fileUploadArea.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    this.classList.add('dragover');
+                });
+                
+                fileUploadArea.addEventListener('dragleave', function() {
+                    this.classList.remove('dragover');
+                });
+                
+                fileUploadArea.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('dragover');
+                    
+                    const file = e.dataTransfer.files[0];
+                    if (file) {
+                        excelFileInput.files = e.dataTransfer.files;
+                        handleExcelFile(file);
+                    }
+                });
+            }
+            
             // Reset modals when closed
             document.getElementById('assignModal').addEventListener('hidden.bs.modal', function() {
                 this.removeAttribute('data-member-index');
@@ -1846,6 +2202,7 @@
             document.getElementById('addMemberModal').addEventListener('hidden.bs.modal', function() {
                 document.getElementById('memberName').value = '';
                 document.getElementById('memberEmail').value = '';
+                resetExcelUpload();
             });
             
             document.getElementById('deleteMemberModal').addEventListener('hidden.bs.modal', function() {
